@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreHorizontal, Download, Copy, Maximize2, RefreshCw, History, Users, LayoutTemplate, X } from "lucide-react";
+import { MoreHorizontal, Download, Copy, Maximize2, RefreshCw, History, Users, LayoutTemplate, X, Sparkles } from "lucide-react";
 import { Button } from "../ui/button";
 
 interface Generation {
@@ -15,9 +15,56 @@ interface FeedProps {
     generations: Generation[];
     onVary?: (gen: Generation) => void;
     onEdit?: (gen: Generation) => void;
+    isGenerating?: boolean;
 }
 
-export function Feed({ generations, onVary, onEdit }: FeedProps) {
+function SkeletonCard() {
+    return (
+        <div className="space-y-3">
+            <div className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/5 aspect-[4/5] flex items-center justify-center group">
+                <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 via-transparent to-blue-500/10 animate-pulse" />
+                <div className="flex flex-col items-center gap-3 z-10">
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
+                        <Sparkles className="h-8 w-8 text-purple-400 animate-bounce" />
+                    </div>
+                    <span className="text-sm font-medium text-purple-200/70 animate-pulse">Dreaming...</span>
+                </div>
+                {/* Scanning line effect */}
+                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent -translate-y-full animate-[shimmer_2s_infinite]" />
+            </div>
+            <div className="flex justify-between items-center px-1">
+                <div className="h-4 w-2/3 bg-white/5 rounded animate-pulse" />
+                <div className="h-4 w-8 bg-white/5 rounded animate-pulse" />
+            </div>
+        </div>
+    );
+}
+
+function ProgressiveImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+    const [isLoading, setIsLoading] = useState(true);
+
+    return (
+        <div className={`relative overflow-hidden ${className?.includes("h-") ? "" : "w-full h-full"} bg-black/50`}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={src}
+                alt={alt}
+                className={`w-full h-full transition-all duration-[2000ms] ease-out ${isLoading ? "scale-110 blur-xl grayscale opacity-0" : "scale-100 blur-0 grayscale-0 opacity-100"
+                    } ${className || "object-cover"}`}
+                onLoad={() => setIsLoading(false)}
+            />
+            {isLoading && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-full h-full bg-white/5 animate-pulse" />
+                </div>
+            )}
+        </div>
+    );
+}
+
+export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
+    // ... existing handlers ...
     const handleDownload = (imageUrl: string, prompt: string) => {
         const link = document.createElement("a");
         link.href = imageUrl;
@@ -63,7 +110,7 @@ export function Feed({ generations, onVary, onEdit }: FeedProps) {
 
             {/* Feed Content */}
             <div className="flex-1 overflow-y-auto p-6">
-                {generations.length === 0 ? (
+                {generations.length === 0 && !isGenerating ? (
                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                         <div className="bg-white/5 p-4 rounded-full mb-4">
                             <RefreshCw className="h-8 w-8 opacity-50" />
@@ -72,6 +119,7 @@ export function Feed({ generations, onVary, onEdit }: FeedProps) {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {isGenerating && <SkeletonCard />}
                         {generations.map((gen) => (
                             <div key={gen.id} className="space-y-3 group">
                                 {/* Image Card */}
@@ -80,12 +128,7 @@ export function Feed({ generations, onVary, onEdit }: FeedProps) {
                                     onClick={() => setSelectedImage(gen)}
                                 >
                                     <div className="aspect-[4/5] relative">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={gen.image}
-                                            alt={gen.prompt}
-                                            className="w-full h-full object-cover bg-black/50"
-                                        />
+                                        <ProgressiveImage src={gen.image} alt={gen.prompt} />
 
                                         {/* Overlay Actions */}
                                         <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
@@ -150,8 +193,7 @@ export function Feed({ generations, onVary, onEdit }: FeedProps) {
             {selectedImage && (
                 <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
                     <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                        <ProgressiveImage
                             src={selectedImage.image}
                             alt={selectedImage.prompt}
                             className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"

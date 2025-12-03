@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import db from "@/lib/db";
+import { uploadImageToDrive } from "@/lib/drive";
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -145,13 +146,32 @@ export async function POST(req: NextRequest) {
         const deductStmt = db.prepare("UPDATE credits SET amount = amount - 1 WHERE user_id = ?");
         deductStmt.run(userId);
 
-        // 7. Save to History
+
+
+        // 7. Save to History (and Drive if configured)
+        let finalImageUrl = imageUrl;
+
+        if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+            try {
+                console.log("Uploading to Google Drive...");
+                const filename = `nano_banana_${Date.now()}.png`;
+                // Upload to Drive
+                const driveLink = await uploadImageToDrive(imageUrl, filename, process.env.GOOGLE_DRIVE_FOLDER_ID);
+                if (driveLink) {
+                    finalImageUrl = driveLink;
+                    console.log("Uploaded to Drive:", finalImageUrl);
+                }
+            } catch (driveError) {
+                console.error("Failed to upload to Drive, falling back to original URL/Base64:", driveError);
+            }
+        }
+
         const historyPrompt = editInstruction ? `[Edit] ${editInstruction}` : prompt;
         const insertStmt = db.prepare(`
-      INSERT INTO generations (user_id, prompt, style, size, image_url)
-      VALUES (?, ?, ?, ?, ?)
-    `);
-        insertStmt.run(userId, historyPrompt, style || "Edit", `${width}x${height}`, imageUrl);
+            INSERT INTO generations (user_id, prompt, style, size, image_url)
+            VALUES (?, ?, ?, ?, ?)
+        `);
+        insertStmt.run(userId, historyPrompt, style || "Edit", `${width}x${height}`, finalImageUrl);
 
         return NextResponse.json({
             success: true,

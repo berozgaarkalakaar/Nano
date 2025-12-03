@@ -94,7 +94,7 @@ export default function Home() {
         editImage={editImage}
         setEditImage={setEditImage}
       />
-      <Feed generations={generations} onEdit={handleEdit} />
+      <Feed generations={generations} onEdit={handleEdit} isGenerating={isGenerating} />
     </main>
   );
 }
