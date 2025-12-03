@@ -34,30 +34,47 @@ export default function Home() {
     style?: string;
     editImage?: string;
     editInstruction?: string;
+    batchSize?: number;
   }) => {
     setIsGenerating(true);
     try {
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      const count = data.batchSize || 1;
+      const promises = [];
 
-      const result = await response.json();
+      for (let i = 0; i < count; i++) {
+        promises.push(
+          fetch("/api/generate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          }).then(async (response) => {
+            const result = await response.json();
+            if (result.success) {
+              // Detect actual image dimensions
+              const img = new Image();
+              img.src = result.image;
+              await new Promise((resolve) => {
+                img.onload = () => resolve(null);
+              });
 
-      if (result.success) {
-        const newGen: Generation = {
-          id: Date.now(),
-          image: result.image,
-          prompt: data.prompt || data.editInstruction || "Generated Image",
-          style: data.style || "None",
-          size: `${data.width}x${data.height}`,
-          created_at: new Date().toISOString()
-        };
-        setGenerations((prev) => [newGen, ...prev]);
-      } else {
-        alert(result.error || "Failed to generate");
+              const newGen: Generation = {
+                id: Date.now() + i, // Ensure unique ID
+                image: result.image,
+                prompt: data.prompt || data.editInstruction || "Generated Image",
+                style: data.style || "None",
+                size: `${img.naturalWidth}x${img.naturalHeight}`, // Use ACTUAL dimensions
+                created_at: new Date().toISOString()
+              };
+              setGenerations((prev) => [newGen, ...prev]);
+            } else {
+              console.error("Generation failed:", result.error);
+            }
+          })
+        );
       }
+
+      await Promise.all(promises);
+
     } catch (error) {
       console.error("Error generating:", error);
       alert("Something went wrong");

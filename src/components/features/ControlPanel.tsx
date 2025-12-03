@@ -29,6 +29,9 @@ interface ControlPanelProps {
         fixedObjects: Record<string, boolean>;
         editImage?: string;
         editInstruction?: string;
+        batchSize?: number;
+        aspectRatio?: string;
+        resolution?: string;
     }) => Promise<void>;
     isGenerating: boolean;
     isEditMode: boolean;
@@ -54,6 +57,15 @@ const RESOLUTIONS = [
     { label: "2K", base: 2048 },
 ];
 
+const TAG_CATEGORIES: Record<string, string[]> = {
+    Style: ["#oilpainting", "#photo", "#editorial", "#cyberpunk", "#digital-art", "#3d-render", "#anime"],
+    Character: ["@nano_core", "A futuristic astronaut", "A banana-shaped drone", "A glowing orb"],
+    Object: ["Floating banana", "Liquid metal sphere", "Nano-glass structure", "Iridescent polymer"],
+    Color: ["neon citrus", "cosmic purple", "blueandyellow", "deep charcoal", "gold-glow"],
+    Camera: ["#cinematic", "#close-up", "#drone", "#wide-angle", "#macro"],
+    Effects: ["#iridescent", "#vibrant", "#dramatic", "#chiaroscuro", "#soft-lighting", "#volumetric-fog"]
+};
+
 export function ControlPanel({
     onGenerate,
     isGenerating,
@@ -65,8 +77,10 @@ export function ControlPanel({
     const [prompt, setPrompt] = useState("");
     const [aspectRatio, setAspectRatio] = useState("1:1");
     const [resolution, setResolution] = useState("1K");
+    const [batchSize, setBatchSize] = useState(1);
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [safeMode, setSafeMode] = useState(true);
+    const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editImageInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +107,14 @@ export function ControlPanel({
             };
             reader.readAsDataURL(file);
         }
+    };
+
+    const addTag = (tag: string) => {
+        setPrompt(prev => {
+            const prefix = prev.trim().length > 0 ? " " : "";
+            return prev.trim() + prefix + tag;
+        });
+        setActiveCategory(null);
     };
 
     const handleSubmit = () => {
@@ -127,7 +149,9 @@ export function ControlPanel({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 editImage: editImage as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                editInstruction: prompt as any
+                editInstruction: prompt as any,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                batchSize: 1 as any // Edit mode usually 1 at a time
             } as any);
         } else {
             onGenerate({
@@ -135,7 +159,13 @@ export function ControlPanel({
                 width,
                 height,
                 referenceImages,
-                fixedObjects: {}
+                fixedObjects: {},
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                batchSize: batchSize as any,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                aspectRatio: aspectRatio as any,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                resolution: resolution as any
             });
         }
     };
@@ -171,7 +201,9 @@ export function ControlPanel({
                             <div className="bg-white/10 p-1 rounded">
                                 <span className="font-bold text-white text-xs">G</span>
                             </div>
-                            <span className="text-sm font-medium text-white">Google Nano Banana Pro</span>
+                            <span className="text-sm font-medium text-white">
+                                {isEditMode ? "Visual Prompting" : "Google Nano Banana Pro"}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -228,7 +260,7 @@ export function ControlPanel({
                 ) : (
                     <>
                         {/* References */}
-                        <div className="space-y-2">
+                        <div className="space-y-2 relative">
                             <div className="flex items-center justify-between">
                                 <Label className="text-xs font-semibold text-muted-foreground">REFERENCES</Label>
                                 <Button variant="ghost" size="sm" className="h-6 text-blue-400 hover:text-blue-300 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
@@ -245,12 +277,42 @@ export function ControlPanel({
                             </div>
 
                             <div className="grid grid-cols-3 gap-2">
-                                <ReferenceCard icon={User} label="Character" />
-                                <ReferenceCard icon={Box} label="Object" />
-                                <ReferenceCard icon={Palette} label="Color" />
-                                <ReferenceCard icon={Camera} label="Camera" />
-                                <ReferenceCard icon={Wand2} label="Effects" />
-                                <ReferenceCard icon={Sparkles} label="Style" />
+                                <ReferenceCard
+                                    icon={User}
+                                    label="Character"
+                                    isActive={activeCategory === "Character"}
+                                    onClick={() => setActiveCategory(activeCategory === "Character" ? null : "Character")}
+                                />
+                                <ReferenceCard
+                                    icon={Box}
+                                    label="Object"
+                                    isActive={activeCategory === "Object"}
+                                    onClick={() => setActiveCategory(activeCategory === "Object" ? null : "Object")}
+                                />
+                                <ReferenceCard
+                                    icon={Palette}
+                                    label="Color"
+                                    isActive={activeCategory === "Color"}
+                                    onClick={() => setActiveCategory(activeCategory === "Color" ? null : "Color")}
+                                />
+                                <ReferenceCard
+                                    icon={Camera}
+                                    label="Camera"
+                                    isActive={activeCategory === "Camera"}
+                                    onClick={() => setActiveCategory(activeCategory === "Camera" ? null : "Camera")}
+                                />
+                                <ReferenceCard
+                                    icon={Wand2}
+                                    label="Effects"
+                                    isActive={activeCategory === "Effects"}
+                                    onClick={() => setActiveCategory(activeCategory === "Effects" ? null : "Effects")}
+                                />
+                                <ReferenceCard
+                                    icon={Sparkles}
+                                    label="Style"
+                                    isActive={activeCategory === "Style"}
+                                    onClick={() => setActiveCategory(activeCategory === "Style" ? null : "Style")}
+                                />
 
                                 <div
                                     className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
@@ -273,6 +335,22 @@ export function ControlPanel({
                                     </div>
                                 ))}
                             </div>
+
+                            {/* Tag Selection Popover/List */}
+                            {activeCategory && TAG_CATEGORIES[activeCategory] && (
+                                <div className="absolute top-full left-0 right-0 z-10 mt-2 p-2 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl grid grid-cols-2 gap-2 animate-in fade-in zoom-in-95 duration-200">
+                                    {TAG_CATEGORIES[activeCategory].map((tag) => (
+                                        <button
+                                            key={tag}
+                                            className="text-xs text-left px-2 py-1.5 rounded hover:bg-white/10 text-white truncate"
+                                            onClick={() => addTag(tag)}
+                                            title={tag}
+                                        >
+                                            {tag}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Prompt */}
@@ -322,11 +400,21 @@ export function ControlPanel({
 
                     <div className="flex items-center gap-2">
                         <div className="flex items-center bg-[#1a1a1a] rounded-lg border border-white/5 p-1">
-                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded hover:bg-white/10">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 rounded hover:bg-white/10"
+                                onClick={() => setBatchSize(Math.max(1, batchSize - 1))}
+                            >
                                 <Minus className="h-3 w-3" />
                             </Button>
-                            <span className="w-6 text-center text-xs font-medium">1</span>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 rounded hover:bg-white/10">
+                            <span className="w-6 text-center text-xs font-medium">{batchSize}</span>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 rounded hover:bg-white/10"
+                                onClick={() => setBatchSize(Math.min(4, batchSize + 1))}
+                            >
                                 <Plus className="h-3 w-3" />
                             </Button>
                         </div>
@@ -366,11 +454,27 @@ export function ControlPanel({
     );
 }
 
-function ReferenceCard({ icon: Icon, label }: { icon: React.ElementType, label: string }) {
+function ReferenceCard({
+    icon: Icon,
+    label,
+    isActive,
+    onClick
+}: {
+    icon: React.ElementType,
+    label: string,
+    isActive?: boolean,
+    onClick?: () => void
+}) {
     return (
-        <div className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square">
-            <Icon className="h-4 w-4 text-muted-foreground" />
-            <span className="text-[10px] text-muted-foreground">{label}</span>
+        <div
+            className={cn(
+                "border border-dashed rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors aspect-square",
+                isActive ? "bg-white/10 border-white/20" : "border-white/10 hover:bg-white/5"
+            )}
+            onClick={onClick}
+        >
+            <Icon className={cn("h-4 w-4", isActive ? "text-white" : "text-muted-foreground")} />
+            <span className={cn("text-[10px]", isActive ? "text-white" : "text-muted-foreground")}>{label}</span>
         </div>
     );
 }

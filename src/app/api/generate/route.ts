@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
         // 2. Parse Body
         const body = await req.json();
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { prompt, style, width, height, referenceImages, baseImageIndex: _baseImageIndex, fixedObjects, editImage, editInstruction } = body;
+        const { prompt, style, width, height, referenceImages, baseImageIndex: _baseImageIndex, fixedObjects, editImage, editInstruction, aspectRatio, resolution } = body;
 
         if (!prompt && !editInstruction) {
             return NextResponse.json({ error: "Prompt or edit instruction is required" }, { status: 400 });
@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
         }
 
         // 4. Prepare Gemini Request
-        const model = genAI.getGenerativeModel({ model: "gemini-3-pro-image-preview" });
+        const modelName = "gemini-3-pro-image-preview";
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const parts: any[] = [];
@@ -44,10 +45,10 @@ export async function POST(req: NextRequest) {
 
         if (editInstruction && editImage) {
             // Chat-to-Edit Mode
-            fullPrompt = `Edit this image: ${editInstruction}\n\nTarget Resolution: ${width}x${height}`;
+            fullPrompt = `Edit this image: ${editInstruction}`;
         } else {
             // Standard Generation Mode
-            fullPrompt = `${prompt}\n\nStyle: ${style}\nTarget Resolution: ${width}x${height}`;
+            fullPrompt = `${prompt}\n\nStyle: ${style}`;
             if (fixedObjects) {
                 const fixed = Object.entries(fixedObjects)
                     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -57,6 +58,12 @@ export async function POST(req: NextRequest) {
                 if (fixed) fullPrompt += `\nKeep fixed: ${fixed}`;
             }
         }
+
+        console.log("--- GENERATION REQUEST ---");
+        console.log("Model:", modelName);
+        console.log("Config:", { aspectRatio, resolution });
+        console.log("Full Prompt:", fullPrompt);
+        console.log("--------------------------");
 
         parts.push({ text: fullPrompt });
 
@@ -88,20 +95,14 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. Call API
-        // Note: This is a standard generateContent call. 
-        // For actual image generation models, the response structure might differ (e.g. images property).
-        // We'll assume it returns standard content or we might need to use a specific method if the SDK updates.
-        // For now, we'll try to generate.
-
-        // IMPORTANT: If the model is strictly an image generation model, it might not accept 'generateContent' in the same way 
-        // or might return a different response. 
-        // However, given the instructions, we proceed with standard multimodal input.
-
         const result = await model.generateContent({
             contents: [{ role: "user", parts }],
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             generationConfig: {
-                // width and height are not supported in standard generationConfig for this model
+                imageConfig: {
+                    aspectRatio: aspectRatio || "1:1",
+                    imageSize: resolution || "1K"
+                }
             } as any
         });
 
