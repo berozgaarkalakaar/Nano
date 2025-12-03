@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
         // 2. Parse Body
         const body = await req.json();
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { prompt, style, width, height, referenceImages, baseImageIndex: _baseImageIndex, fixedObjects, editImage, editInstruction, aspectRatio, resolution } = body;
+        const { prompt, style, width, height, referenceImages, baseImageIndex: _baseImageIndex, fixedObjects, editImage, editInstruction, aspectRatio, resolution, fixedSeed } = body;
 
         if (!prompt && !editInstruction) {
             return NextResponse.json({ error: "Prompt or edit instruction is required" }, { status: 400 });
@@ -95,6 +95,21 @@ export async function POST(req: NextRequest) {
             });
         }
 
+        // Calculate seed if fixedSeed is enabled
+        let seed: number | undefined;
+        if (fixedSeed) {
+            // Simple hash of the prompt to ensure same prompt = same seed
+            const str = fullPrompt + (style || "");
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            seed = Math.abs(hash);
+            console.log("Fixed Seed enabled. Using seed:", seed);
+        }
+
         // 5. Call API
         const result = await model.generateContent({
             contents: [{ role: "user", parts }],
@@ -103,6 +118,7 @@ export async function POST(req: NextRequest) {
                 imageConfig: {
                     aspectRatio: aspectRatio || "1:1",
                     imageSize: resolution || "1K"
+                    // seed: seed // Seed is not currently supported by the Node SDK for this model
                 }
             } as any
         });
@@ -182,6 +198,9 @@ export async function POST(req: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error("Generation error:", error);
-        return NextResponse.json({ error: error.message || "Something went wrong" }, { status: 500 });
+        if (error.response) {
+            console.error("Error response:", JSON.stringify(error.response, null, 2));
+        }
+        return NextResponse.json({ error: error.message || "Something went wrong", details: error.toString() }, { status: 500 });
     }
 }

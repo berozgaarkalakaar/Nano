@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreHorizontal, Download, Copy, Maximize2, RefreshCw, History, Users, LayoutTemplate, X, Sparkles } from "lucide-react";
+import { MoreHorizontal, Download, Copy, Maximize2, RefreshCw, History, Users, LayoutTemplate, X, Sparkles, Folder, Video, Edit2, Share2, Wand2 } from "lucide-react";
 import { Button } from "../ui/button";
 
 interface Generation {
@@ -122,7 +122,6 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                         {isGenerating && <SkeletonCard />}
                         {generations.map((gen) => (
                             <div key={gen.id} className="space-y-3 group">
-                                {/* Image Card */}
                                 <div
                                     className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/5 cursor-zoom-in"
                                     onClick={() => setSelectedImage(gen)}
@@ -130,48 +129,59 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                     <div className="aspect-[4/5] relative">
                                         <ProgressiveImage src={gen.image} alt={gen.prompt} />
 
-                                        {/* Overlay Actions */}
-                                        <div className="absolute top-4 right-4 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                            <Button
-                                                size="icon"
-                                                variant="secondary"
-                                                className="h-8 w-8 rounded-lg bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm border border-white/10"
-                                                onClick={() => handleCopyPrompt(gen.prompt)}
-                                                title="Copy Prompt"
-                                            >
-                                                <Copy className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                size="icon"
-                                                variant="secondary"
-                                                className="h-8 w-8 rounded-lg bg-black/50 hover:bg-black/70 text-white backdrop-blur-sm border border-white/10"
-                                                onClick={() => handleDownload(gen.image, gen.prompt)}
-                                                title="Download Image"
-                                            >
-                                                <Download className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-
-                                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                                            <div
-                                                className="bg-white text-black px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-gray-200 shadow-lg"
-                                                onClick={() => onEdit?.(gen)}
-                                            >
-                                                <RefreshCw className="h-3 w-3" />
-                                                Edit
+                                        {/* Hover Overlay */}
+                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
+                                            {/* Top Left: Selection */}
+                                            <div className="absolute top-3 left-3">
+                                                <div className="w-5 h-5 rounded border border-white/50 bg-black/20 hover:bg-black/40 cursor-pointer" />
                                             </div>
-                                            <div
-                                                className="bg-black/60 text-white px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 cursor-pointer hover:bg-black/80 backdrop-blur-sm border border-white/10 shadow-lg"
-                                                onClick={() => alert("Upscaling is not supported by this model version yet.")}
-                                            >
-                                                <Maximize2 className="h-3 w-3" />
-                                                Upscale
-                                            </div>
-                                        </div>
 
-                                        {/* Google Logo Mock */}
-                                        <div className="absolute bottom-4 left-4 bg-white/10 p-1 rounded backdrop-blur-sm">
-                                            <span className="font-bold text-white text-xs">G</span>
+                                            {/* Top Right: Actions */}
+                                            <div className="absolute top-3 right-3 flex items-center gap-2">
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm">
+                                                    <MoreHorizontal className="h-4 w-4" />
+                                                </Button>
+                                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm">
+                                                    <Folder className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
+                                                    onClick={() => handleDownload(gen.image, gen.prompt)}
+                                                >
+                                                    <Download className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+
+                                            {/* Bottom Left: Google Logo */}
+                                            <div className="absolute bottom-3 left-3">
+                                                <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                                    <span className="font-bold text-black text-xs">G</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Bottom Right: Primary Actions */}
+                                            <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                                                <Button size="icon" variant="ghost" className="h-9 w-9 rounded-full bg-white text-black hover:bg-gray-200 shadow-lg">
+                                                    <Video className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    size="icon"
+                                                    variant="ghost"
+                                                    className="h-9 w-9 rounded-full bg-white text-black hover:bg-gray-200 shadow-lg"
+                                                    onClick={() => onEdit?.(gen)}
+                                                >
+                                                    <Edit2 className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    className="h-9 px-4 rounded-full bg-white text-black hover:bg-gray-200 font-medium shadow-lg"
+                                                    onClick={() => onVary?.(gen)}
+                                                >
+                                                    Vary
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -190,32 +200,112 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
             </div>
 
             {/* Lightbox Modal */}
+            {/* Lightbox Modal */}
             {selectedImage && (
-                <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
-                    <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
-                        <ProgressiveImage
-                            src={selectedImage.image}
-                            alt={selectedImage.prompt}
-                            className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl"
-                        />
-                        <Button
-                            size="icon"
-                            variant="ghost"
-                            className="absolute -top-12 right-0 text-white hover:bg-white/20 rounded-full"
-                            onClick={() => setSelectedImage(null)}
-                        >
-                            <X className="h-6 w-6" />
-                        </Button>
+                <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
+                    <div className="w-full h-full flex overflow-hidden" onClick={(e) => e.stopPropagation()}>
 
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4">
+                        {/* Left: Image Area */}
+                        <div className="flex-1 relative flex items-center justify-center bg-[#090909] p-8">
+                            <ProgressiveImage
+                                src={selectedImage.image}
+                                alt={selectedImage.prompt}
+                                className="max-w-full max-h-full object-contain shadow-2xl"
+                            />
                             <Button
-                                variant="secondary"
-                                className="bg-white text-black hover:bg-gray-200"
-                                onClick={() => handleDownload(selectedImage.image, selectedImage.prompt)}
+                                size="icon"
+                                variant="ghost"
+                                className="absolute top-4 left-4 text-white hover:bg-white/10 rounded-full"
+                                onClick={() => setSelectedImage(null)}
                             >
-                                <Download className="h-4 w-4 mr-2" />
-                                Download Original
+                                <X className="h-6 w-6" />
                             </Button>
+                        </div>
+
+                        {/* Right: Details Panel */}
+                        <div className="w-[400px] bg-[#1a1a1a] border-l border-white/5 flex flex-col h-full overflow-y-auto">
+                            <div className="p-6 space-y-8">
+                                {/* Header Actions */}
+                                <div className="flex items-center justify-end gap-2">
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">
+                                        <Share2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => handleDownload(selectedImage.image, selectedImage.prompt)}>
+                                        <Download className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                </div>
+
+                                {/* Prompt Section */}
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">PROMPT</h3>
+                                    <p className="text-sm text-gray-200 leading-relaxed">
+                                        {selectedImage.prompt}
+                                    </p>
+                                    <button className="text-xs text-blue-400 hover:text-blue-300 font-medium">See more</button>
+                                </div>
+
+                                {/* Reference Section (Mock) */}
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">REFERENCE</h3>
+                                    <div className="w-16 h-12 rounded border border-white/10 bg-black/40 flex items-center justify-center">
+                                        <span className="text-[10px] text-gray-600">None</span>
+                                    </div>
+                                </div>
+
+                                {/* Settings Section */}
+                                <div className="space-y-2">
+                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">SETTINGS</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300 border border-white/5">
+                                            {selectedImage.size.replace('x', ':')}
+                                        </span>
+                                        <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300 border border-white/5">
+                                            Google Nano Banana Pro
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Actions List */}
+                                <div className="space-y-1 pt-4">
+                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
+                                        <RefreshCw className="h-4 w-4" />
+                                        Recreate
+                                    </Button>
+                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
+                                        <Maximize2 className="h-4 w-4" />
+                                        Upscale
+                                    </Button>
+                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
+                                        <Video className="h-4 w-4" />
+                                        Create video
+                                    </Button>
+                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
+                                        <Wand2 className="h-4 w-4" />
+                                        Variations
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Footer Action */}
+                            <div className="mt-auto p-6 border-t border-white/5 bg-[#1a1a1a]">
+                                <Button
+                                    className="w-full bg-white text-black hover:bg-gray-200 font-semibold h-10"
+                                    onClick={() => {
+                                        onEdit?.(selectedImage);
+                                        setSelectedImage(null);
+                                    }}
+                                >
+                                    <Edit2 className="h-4 w-4 mr-2" />
+                                    Edit Image
+                                </Button>
+                                <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
+                                    <span>100%</span>
+                                    <span>{selectedImage.size.replace('x', '×')} px</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -14,11 +14,14 @@ interface Generation {
   created_at?: string;
 }
 
+import { AssistantModal } from "@/components/features/AssistantModal";
+
 export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editImage, setEditImage] = useState<string | null>(null);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
 
   const handleEdit = (gen: Generation) => {
     setEditImage(gen.image);
@@ -85,7 +88,7 @@ export default function Home() {
 
   return (
     <main className="flex h-screen bg-black text-white font-sans overflow-hidden">
-      <Sidebar />
+      <Sidebar onAssistantClick={() => setIsAssistantOpen(true)} />
       <ControlPanel
         onGenerate={handleGenerate}
         isGenerating={isGenerating}
@@ -95,6 +98,7 @@ export default function Home() {
         setEditImage={setEditImage}
       />
       <Feed generations={generations} onEdit={handleEdit} isGenerating={isGenerating} />
+      <AssistantModal isOpen={isAssistantOpen} onClose={() => setIsAssistantOpen(false)} />
     </main>
   );
 }

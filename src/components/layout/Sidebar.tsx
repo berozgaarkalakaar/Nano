@@ -14,7 +14,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export function Sidebar() {
+interface SidebarProps {
+    onAssistantClick?: () => void;
+}
+
+export function Sidebar({ onAssistantClick }: SidebarProps) {
     return (
         <div className="w-64 h-screen bg-[#0f0f0f] border-r border-white/5 flex flex-col flex-shrink-0">
             {/* Logo */}
@@ -42,7 +46,7 @@ export function Sidebar() {
                 <h3 className="text-xs font-semibold text-muted-foreground mb-2">Pinned</h3>
                 <div className="space-y-1">
                     <NavItem icon={ImageIcon} label="Image Generator" activeVariant />
-                    <NavItem icon={Bot} label="Assistant" />
+                    <NavItem icon={Bot} label="Assistant" onClick={onAssistantClick} />
                     <NavItem icon={Video} label="Video Generator" />
                     <NavItem icon={LayoutGrid} label="All tools" />
                     <NavItem icon={Sparkles} label="Google AI Studio" href="https://aistudio.google.com/" />
@@ -76,23 +80,28 @@ function NavItem({
     label,
     active,
     activeVariant,
-    href
+    href,
+    onClick
 }: {
     icon: any,
     label: string,
     active?: boolean,
     activeVariant?: boolean,
-    href?: string
+    href?: string,
+    onClick?: () => void
 }) {
     const content = (
-        <div className={cn(
-            "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer",
-            activeVariant
-                ? "bg-white/10 text-white"
-                : active
-                    ? "text-white"
-                    : "text-muted-foreground hover:text-white hover:bg-white/5"
-        )}>
+        <div
+            className={cn(
+                "flex items-center gap-3 px-3 py-2 rounded-lg transition-colors cursor-pointer",
+                activeVariant
+                    ? "bg-white/10 text-white"
+                    : active
+                        ? "text-white"
+                        : "text-muted-foreground hover:text-white hover:bg-white/5"
+            )}
+            onClick={onClick}
+        >
             <Icon className={cn("h-5 w-5", active && "text-orange-500")} />
             <span className={cn("text-sm font-medium", active && "text-white")}>{label}</span>
         </div>

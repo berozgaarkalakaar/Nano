@@ -6,11 +6,6 @@ import {
     X,
     Loader2,
     Sparkles,
-    User,
-    Box,
-    Palette,
-    Camera,
-    Wand2,
     Minus,
     Plus,
     Infinity
@@ -57,15 +52,6 @@ const RESOLUTIONS = [
     { label: "2K", base: 2048 },
 ];
 
-const TAG_CATEGORIES: Record<string, string[]> = {
-    Style: ["#oilpainting", "#photo", "#editorial", "#cyberpunk", "#digital-art", "#3d-render", "#anime"],
-    Character: ["@nano_core", "A futuristic astronaut", "A banana-shaped drone", "A glowing orb"],
-    Object: ["Floating banana", "Liquid metal sphere", "Nano-glass structure", "Iridescent polymer"],
-    Color: ["neon citrus", "cosmic purple", "blueandyellow", "deep charcoal", "gold-glow"],
-    Camera: ["#cinematic", "#close-up", "#drone", "#wide-angle", "#macro"],
-    Effects: ["#iridescent", "#vibrant", "#dramatic", "#chiaroscuro", "#soft-lighting", "#volumetric-fog"]
-};
-
 export function ControlPanel({
     onGenerate,
     isGenerating,
@@ -80,7 +66,7 @@ export function ControlPanel({
     const [batchSize, setBatchSize] = useState(1);
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [safeMode, setSafeMode] = useState(true);
-    const [activeCategory, setActiveCategory] = useState<string | null>(null);
+    const [fixedSeed, setFixedSeed] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editImageInputRef = useRef<HTMLInputElement>(null);
@@ -107,14 +93,6 @@ export function ControlPanel({
             };
             reader.readAsDataURL(file);
         }
-    };
-
-    const addTag = (tag: string) => {
-        setPrompt(prev => {
-            const prefix = prev.trim().length > 0 ? " " : "";
-            return prev.trim() + prefix + tag;
-        });
-        setActiveCategory(null);
     };
 
     const handleSubmit = () => {
@@ -151,7 +129,9 @@ export function ControlPanel({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 editInstruction: prompt as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                batchSize: 1 as any // Edit mode usually 1 at a time
+                batchSize: 1 as any, // Edit mode usually 1 at a time
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                fixedSeed: fixedSeed as any
             } as any);
         } else {
             onGenerate({
@@ -165,7 +145,9 @@ export function ControlPanel({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 aspectRatio: aspectRatio as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                resolution: resolution as any
+                resolution: resolution as any,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                fixedSeed: fixedSeed as any
             });
         }
     };
@@ -228,6 +210,7 @@ export function ControlPanel({
                                                 e.stopPropagation();
                                                 setEditImage(null);
                                             }}
+                                            aria-label="Remove image"
                                         >
                                             <X className="h-3 w-3" />
                                         </Button>
@@ -244,6 +227,7 @@ export function ControlPanel({
                                     className="hidden"
                                     accept="image/*"
                                     onChange={handleEditImageChange}
+                                    aria-label="Upload image to edit"
                                 />
                             </div>
                         </div>
@@ -273,47 +257,11 @@ export function ControlPanel({
                                     multiple
                                     accept="image/*"
                                     onChange={handleFileChange}
+                                    aria-label="Upload reference images"
                                 />
                             </div>
 
                             <div className="grid grid-cols-3 gap-2">
-                                <ReferenceCard
-                                    icon={User}
-                                    label="Character"
-                                    isActive={activeCategory === "Character"}
-                                    onClick={() => setActiveCategory(activeCategory === "Character" ? null : "Character")}
-                                />
-                                <ReferenceCard
-                                    icon={Box}
-                                    label="Object"
-                                    isActive={activeCategory === "Object"}
-                                    onClick={() => setActiveCategory(activeCategory === "Object" ? null : "Object")}
-                                />
-                                <ReferenceCard
-                                    icon={Palette}
-                                    label="Color"
-                                    isActive={activeCategory === "Color"}
-                                    onClick={() => setActiveCategory(activeCategory === "Color" ? null : "Color")}
-                                />
-                                <ReferenceCard
-                                    icon={Camera}
-                                    label="Camera"
-                                    isActive={activeCategory === "Camera"}
-                                    onClick={() => setActiveCategory(activeCategory === "Camera" ? null : "Camera")}
-                                />
-                                <ReferenceCard
-                                    icon={Wand2}
-                                    label="Effects"
-                                    isActive={activeCategory === "Effects"}
-                                    onClick={() => setActiveCategory(activeCategory === "Effects" ? null : "Effects")}
-                                />
-                                <ReferenceCard
-                                    icon={Sparkles}
-                                    label="Style"
-                                    isActive={activeCategory === "Style"}
-                                    onClick={() => setActiveCategory(activeCategory === "Style" ? null : "Style")}
-                                />
-
                                 <div
                                     className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
                                     onClick={() => fileInputRef.current?.click()}
@@ -329,28 +277,13 @@ export function ControlPanel({
                                         <button
                                             onClick={() => setReferenceImages(prev => prev.filter((_, idx) => idx !== i))}
                                             className="absolute top-1 right-1 bg-black/50 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            aria-label="Remove image"
                                         >
                                             <X className="h-3 w-3 text-white" />
                                         </button>
                                     </div>
                                 ))}
                             </div>
-
-                            {/* Tag Selection Popover/List */}
-                            {activeCategory && TAG_CATEGORIES[activeCategory] && (
-                                <div className="absolute top-full left-0 right-0 z-10 mt-2 p-2 bg-[#1a1a1a] border border-white/10 rounded-lg shadow-xl grid grid-cols-2 gap-2 animate-in fade-in zoom-in-95 duration-200">
-                                    {TAG_CATEGORIES[activeCategory].map((tag) => (
-                                        <button
-                                            key={tag}
-                                            className="text-xs text-left px-2 py-1.5 rounded hover:bg-white/10 text-white truncate"
-                                            onClick={() => addTag(tag)}
-                                            title={tag}
-                                        >
-                                            {tag}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
                         </div>
 
                         {/* Prompt */}
@@ -430,6 +363,28 @@ export function ControlPanel({
                             <span className="text-xs font-bold">{safeMode ? "ON" : "OFF"}</span>
                         </div>
                     </div>
+
+                    {/* Fixed Seed Toggle */}
+                    <div className="bg-[#1a1a1a] rounded-lg p-3 border border-white/5 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-xs font-semibold text-white">Fixed seed</Label>
+                            <div
+                                className={cn(
+                                    "w-8 h-4 rounded-full relative cursor-pointer transition-colors",
+                                    fixedSeed ? "bg-white" : "bg-white/20"
+                                )}
+                                onClick={() => setFixedSeed(!fixedSeed)}
+                            >
+                                <div className={cn(
+                                    "absolute top-0.5 w-3 h-3 rounded-full bg-black transition-all",
+                                    fixedSeed ? "left-4.5" : "left-0.5"
+                                )} />
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground leading-tight">
+                            Enable this to get consistent results every time you use the same prompt.
+                        </p>
+                    </div>
                 </div>
 
                 <Button
@@ -450,31 +405,6 @@ export function ControlPanel({
                     )}
                 </Button>
             </div>
-        </div>
-    );
-}
-
-function ReferenceCard({
-    icon: Icon,
-    label,
-    isActive,
-    onClick
-}: {
-    icon: React.ElementType,
-    label: string,
-    isActive?: boolean,
-    onClick?: () => void
-}) {
-    return (
-        <div
-            className={cn(
-                "border border-dashed rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors aspect-square",
-                isActive ? "bg-white/10 border-white/20" : "border-white/10 hover:bg-white/5"
-            )}
-            onClick={onClick}
-        >
-            <Icon className={cn("h-4 w-4", isActive ? "text-white" : "text-muted-foreground")} />
-            <span className={cn("text-[10px]", isActive ? "text-white" : "text-muted-foreground")}>{label}</span>
         </div>
     );
 }
