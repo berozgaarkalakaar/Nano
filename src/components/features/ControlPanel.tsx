@@ -26,7 +26,8 @@ interface ControlPanelProps {
         editInstruction?: string;
         batchSize?: number;
         aspectRatio?: string;
-        resolution?: string;
+        quality?: string;
+        fixedSeed?: boolean;
     }) => Promise<void>;
     isGenerating: boolean;
     isEditMode: boolean;
@@ -47,9 +48,10 @@ const ASPECT_RATIOS = [
     { label: "3:2", ratio: 3 / 2 },
 ];
 
-const RESOLUTIONS = [
-    { label: "1K", base: 1024 },
-    { label: "2K", base: 2048 },
+const QUALITIES = [
+    { label: "Base 1K", value: "BASE_1K", base: 1024 },
+    { label: "Hi-res 2K", value: "HIRES_2K", base: 2048 },
+    { label: "Ultra 4K", value: "ULTRA_4K", base: 4096 },
 ];
 
 export function ControlPanel({
@@ -62,7 +64,7 @@ export function ControlPanel({
 }: ControlPanelProps) {
     const [prompt, setPrompt] = useState("");
     const [aspectRatio, setAspectRatio] = useState("1:1");
-    const [resolution, setResolution] = useState("1K");
+    const [quality, setQuality] = useState("BASE_1K");
     const [batchSize, setBatchSize] = useState(1);
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [safeMode, setSafeMode] = useState(true);
@@ -100,8 +102,8 @@ export function ControlPanel({
 
         // Calculate dimensions
         const selectedRatio = ASPECT_RATIOS.find(r => r.label === aspectRatio) || ASPECT_RATIOS[0];
-        const selectedRes = RESOLUTIONS.find(r => r.label === resolution) || RESOLUTIONS[0];
-        const base = selectedRes.base;
+        const selectedQuality = QUALITIES.find(q => q.value === quality) || QUALITIES[0];
+        const base = selectedQuality.base;
 
         let width, height;
         if (selectedRatio.ratio === 1) {
@@ -145,7 +147,7 @@ export function ControlPanel({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 aspectRatio: aspectRatio as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                resolution: resolution as any,
+                quality: quality as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 fixedSeed: fixedSeed as any
             });
@@ -317,15 +319,15 @@ export function ControlPanel({
                     </div>
 
                     <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-muted-foreground">RESOLUTION</Label>
+                        <Label className="text-xs font-semibold text-muted-foreground">QUALITY</Label>
                         <Select
-                            value={resolution}
-                            onChange={(e) => setResolution(e.target.value)}
+                            value={quality}
+                            onChange={(e) => setQuality(e.target.value)}
                             className="w-full bg-[#1a1a1a] border-white/5 text-white"
                         >
-                            {RESOLUTIONS.map((res) => (
-                                <option key={res.label} value={res.label} className="bg-[#1a1a1a] text-white">
-                                    {res.label}
+                            {QUALITIES.map((q) => (
+                                <option key={q.value} value={q.value} className="bg-[#1a1a1a] text-white">
+                                    {q.label}
                                 </option>
                             ))}
                         </Select>

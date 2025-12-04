@@ -40,11 +40,18 @@ db.exec(`
   );
 `);
 
+// Migration: Add quality column if not exists
+try {
+  db.exec("ALTER TABLE generations ADD COLUMN quality TEXT");
+} catch (error) {
+  // Column likely exists or other error, ignore
+}
+
 // Seed default user if not exists
 const userCheck = db.prepare("SELECT id FROM users WHERE id = 1").get();
 if (!userCheck) {
-    db.prepare("INSERT INTO users (id, email, password_hash) VALUES (1, 'demo@example.com', 'placeholder')").run();
-    db.prepare("INSERT INTO credits (user_id, amount) VALUES (1, 1000)").run();
+  db.prepare("INSERT INTO users (id, email, password_hash) VALUES (1, 'demo@example.com', 'placeholder')").run();
+  db.prepare("INSERT INTO credits (user_id, amount) VALUES (1, 1000)").run();
 }
 
 export default db;

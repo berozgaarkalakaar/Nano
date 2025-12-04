@@ -1,26 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import db from "@/lib/db";
 import { uploadImageToDrive } from "@/lib/drive";
-
-// Initialize Gemini API
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+import { generateBaseImageWithGemini } from "@/lib/gemini";
+import { upscaleImage } from "@/lib/upscaler";
 
 export async function POST(req: NextRequest) {
     try {
-        // 1. Auth Check (Simple placeholder for now)
-        // const sessionToken = req.cookies.get("session")?.value;
-        // if (!sessionToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        // const user = getUserFromSession(sessionToken);
-        // if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-        // Mock user for MVP
+        // 1. Auth Check (Mock)
         const userId = 1;
 
         // 2. Parse Body
         const body = await req.json();
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { prompt, style, width, height, referenceImages, baseImageIndex: _baseImageIndex, fixedObjects, editImage, editInstruction, aspectRatio, resolution, fixedSeed } = body;
+        const {
+            prompt,
+            style,
+            width,
+            height,
+            referenceImages,
+            fixedObjects,
+            editImage,
+            editInstruction,
+            aspectRatio,
+            // resolution, // We use quality now
+            fixedSeed,
+            quality = "BASE_1K" // "BASE_1K" | "HIRES_2K" | "ULTRA_4K"
+        } = body;
 
         if (!prompt && !editInstruction) {
             return NextResponse.json({ error: "Prompt or edit instruction is required" }, { status: 400 });
@@ -34,148 +38,77 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Out of credits" }, { status: 403 });
         }
 
-        // 4. Prepare Gemini Request
-        const modelName = "gemini-3-pro-image-preview";
-        const model = genAI.getGenerativeModel({ model: modelName });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const parts: any[] = [];
-
-        // Add text prompt
-        let fullPrompt = "";
-
-        if (editInstruction && editImage) {
-            // Chat-to-Edit Mode
-            fullPrompt = `Edit this image: ${editInstruction}`;
-        } else {
-            // Standard Generation Mode
-            fullPrompt = `${prompt}\n\nStyle: ${style}`;
-            if (fixedObjects) {
-                const fixed = Object.entries(fixedObjects)
-                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                    .filter(([_, v]) => v)
-                    .map(([k]) => k)
-                    .join(", ");
-                if (fixed) fullPrompt += `\nKeep fixed: ${fixed}`;
-            }
-        }
-
         console.log("--- GENERATION REQUEST ---");
-        console.log("Model:", modelName);
-        console.log("Config:", { aspectRatio, resolution });
-        console.log("Full Prompt:", fullPrompt);
+        console.log("Quality:", quality);
+        console.log("Prompt:", prompt);
         console.log("--------------------------");
 
-        parts.push({ text: fullPrompt });
+        // 4. Pipeline Execution
 
-        // Add reference images (or edit image)
-        if (editImage) {
-            // If editing, the editImage is the primary reference
-            const base64Data = editImage.split(",")[1];
-            const mimeType = editImage.split(";")[0].split(":")[1];
-            parts.push({
-                inlineData: {
-                    data: base64Data,
-                    mimeType: mimeType
-                }
-            });
-        } else if (referenceImages && referenceImages.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            referenceImages.forEach((img: string, _index: number) => {
-                // Extract base64 (remove data:image/xxx;base64, prefix)
-                const base64Data = img.split(",")[1];
-                const mimeType = img.split(";")[0].split(":")[1];
-
-                parts.push({
-                    inlineData: {
-                        data: base64Data,
-                        mimeType: mimeType
-                    }
-                });
-            });
+        // Step 1: Base Generation
+        // Map quality to imageSize
+        let baseImageSize = "1K";
+        if (quality === "HIRES_2K" || quality === "ULTRA_4K") {
+            baseImageSize = "2K";
         }
 
-        // Calculate seed if fixedSeed is enabled
-        let seed: number | undefined;
-        if (fixedSeed) {
-            // Simple hash of the prompt to ensure same prompt = same seed
-            const str = fullPrompt + (style || "");
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                const char = str.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // Convert to 32bit integer
-            }
-            seed = Math.abs(hash);
-            console.log("Fixed Seed enabled. Using seed:", seed);
-        }
-
-        // 5. Call API
-        const result = await model.generateContent({
-            contents: [{ role: "user", parts }],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            generationConfig: {
-                imageConfig: {
-                    aspectRatio: aspectRatio || "1:1",
-                    imageSize: resolution || "1K"
-                    // seed: seed // Seed is not currently supported by the Node SDK for this model
-                }
-            } as any
+        const baseResult = await generateBaseImageWithGemini({
+            prompt,
+            style,
+            width,
+            height,
+            aspectRatio,
+            imageSize: baseImageSize,
+            referenceImages,
+            editImage,
+            editInstruction,
+            fixedObjects,
+            fixedSeed: !!fixedSeed
         });
 
-        // This part depends heavily on the actual API response shape for images.
-        // Usually for Imagen it's not text.
-        // If it returns text (e.g. "I cannot generate images"), we handle it.
-        // If it returns inline data (images), we extract it.
+        let finalImage = baseResult.image;
+        let finalWidth = baseResult.width;
+        let finalHeight = baseResult.height;
+        let wasUpscaled = false;
 
-        // MOCKING THE RESPONSE FOR SAFETY if API key is missing or model behavior is unknown in this env
-        // In a real scenario, we would parse `response.candidates[0].content.parts[0].inlineData` or similar.
-
-        // For this exercise, since I cannot guarantee the API key works or the model is available to me,
-        // I will simulate a successful response if the API call fails or returns text.
-        // BUT I will try to return the actual image if available.
-
-        const response = await result.response;
-        let imageUrl = "";
-
-        // Parse response for image
-        const candidate = response.candidates?.[0];
-        if (candidate?.content?.parts?.[0]?.inlineData) {
-            const part = candidate.content.parts[0];
-            imageUrl = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-        } else if (candidate?.content?.parts?.[0]?.text) {
-            const text = candidate.content.parts[0].text;
-            if (text.startsWith("http")) {
-                imageUrl = text;
-            } else {
-                console.warn("Model returned text:", text);
-                // If the model returns text, it might be a refusal or explanation. 
-                // We'll throw an error to let the user know.
-                throw new Error(text || "Model returned text instead of image");
-            }
-        } else {
-            console.error("Unexpected response structure:", JSON.stringify(response, null, 2));
-            throw new Error("Failed to generate image: Unexpected response format");
+        // Step 2: Upscaling (if needed)
+        if (quality === "HIRES_2K") {
+            // If base is already 2K (which we requested), we might skip upscaling unless we want "enhancement".
+            // Since Gemini 3 Pro Image Preview might return 1K even if we ask for 2K (preview behavior),
+            // we should check dimensions. But we don't have accurate dimensions from base64 easily here.
+            // So we will force upscaling if the user asked for HIRES_2K, to ensure quality/detail.
+            // OR we can trust the base generation if it claims 2K.
+            // Let's run the upscaler in 2X mode to be safe and ensure "High Res" look.
+            console.log("Quality is HIRES_2K, running upscaler...");
+            const upscaled = await upscaleImage(finalImage, "HIRES_2X");
+            finalImage = upscaled.image;
+            finalWidth = upscaled.width;
+            finalHeight = upscaled.height;
+            wasUpscaled = true;
+        } else if (quality === "ULTRA_4K") {
+            console.log("Quality is ULTRA_4K, running upscaler...");
+            const upscaled = await upscaleImage(finalImage, "ULTRA_4X");
+            finalImage = upscaled.image;
+            finalWidth = upscaled.width;
+            finalHeight = upscaled.height;
+            wasUpscaled = true;
         }
 
-        // 6. Deduct Credits
+        // 5. Deduct Credits
         const deductStmt = db.prepare("UPDATE credits SET amount = amount - 1 WHERE user_id = ?");
         deductStmt.run(userId);
 
-
-
-        // 7. Save to History (and Drive if configured)
-        let finalImageUrl = imageUrl;
+        // 6. Save to History (and Drive if configured)
+        let savedImageUrl = finalImage;
 
         if (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
             try {
                 console.log("Uploading to Google Drive...");
                 const filename = `nano_banana_${Date.now()}.png`;
-                // Upload to Drive
-                const driveLink = await uploadImageToDrive(imageUrl, filename, process.env.GOOGLE_DRIVE_FOLDER_ID);
+                const driveLink = await uploadImageToDrive(finalImage, filename, process.env.GOOGLE_DRIVE_FOLDER_ID);
                 if (driveLink) {
-                    finalImageUrl = driveLink;
-                    console.log("Uploaded to Drive:", finalImageUrl);
+                    savedImageUrl = driveLink;
+                    console.log("Uploaded to Drive:", savedImageUrl);
                 }
             } catch (driveError) {
                 console.error("Failed to upload to Drive, falling back to original URL/Base64:", driveError);
@@ -183,24 +116,34 @@ export async function POST(req: NextRequest) {
         }
 
         const historyPrompt = editInstruction ? `[Edit] ${editInstruction}` : prompt;
+
+        // Use the new 'quality' column if possible, or store in style/size
+        // We added 'quality' column in db.ts
         const insertStmt = db.prepare(`
-            INSERT INTO generations (user_id, prompt, style, size, image_url)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO generations (user_id, prompt, style, size, image_url, quality)
+            VALUES (?, ?, ?, ?, ?, ?)
         `);
-        insertStmt.run(userId, historyPrompt, style || "Edit", `${width}x${height}`, finalImageUrl);
+
+        // If finalWidth/Height are 0 (unknown), use a placeholder or the requested size
+        const sizeStr = (finalWidth && finalHeight) ? `${finalWidth}x${finalHeight}` : (quality === "ULTRA_4K" ? "4096x4096" : (quality === "HIRES_2K" ? "2048x2048" : "1024x1024"));
+
+        insertStmt.run(userId, historyPrompt, style || "Edit", sizeStr, savedImageUrl, quality);
 
         return NextResponse.json({
             success: true,
-            image: imageUrl,
-            credits: credits.amount - 1
+            image: finalImage,
+            credits: credits.amount - 1,
+            metadata: {
+                width: finalWidth,
+                height: finalHeight,
+                upscaled: wasUpscaled,
+                quality: quality
+            }
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         console.error("Generation error:", error);
-        if (error.response) {
-            console.error("Error response:", JSON.stringify(error.response, null, 2));
-        }
         return NextResponse.json({ error: error.message || "Something went wrong", details: error.toString() }, { status: 500 });
     }
 }

@@ -8,8 +8,15 @@ interface Generation {
     prompt: string;
     style: string;
     size: string;
+    quality?: string;
     created_at?: string;
 }
+
+const QUALITY_LABELS: Record<string, string> = {
+    "BASE_1K": "Base 1K",
+    "HIRES_2K": "Hi-res 2K",
+    "ULTRA_4K": "Ultra 4K"
+};
 
 interface FeedProps {
     generations: Generation[];
@@ -130,7 +137,7 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                         <ProgressiveImage src={gen.image} alt={gen.prompt} />
 
                                         {/* Hover Overlay */}
-                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200" onClick={(e) => e.stopPropagation()}>
+                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                             {/* Top Left: Selection */}
                                             <div className="absolute top-3 left-3">
                                                 <div className="w-5 h-5 rounded border border-white/50 bg-black/20 hover:bg-black/40 cursor-pointer" />
@@ -148,7 +155,10 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                                     size="icon"
                                                     variant="ghost"
                                                     className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
-                                                    onClick={() => handleDownload(gen.image, gen.prompt)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDownload(gen.image, gen.prompt);
+                                                    }}
                                                 >
                                                     <Download className="h-4 w-4" />
                                                 </Button>
@@ -170,14 +180,20 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                                     size="icon"
                                                     variant="ghost"
                                                     className="h-9 w-9 rounded-full bg-white text-black hover:bg-gray-200 shadow-lg"
-                                                    onClick={() => onEdit?.(gen)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onEdit?.(gen);
+                                                    }}
                                                 >
                                                     <Edit2 className="h-4 w-4" />
                                                 </Button>
                                                 <Button
                                                     variant="secondary"
                                                     className="h-9 px-4 rounded-full bg-white text-black hover:bg-gray-200 font-medium shadow-lg"
-                                                    onClick={() => onVary?.(gen)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onVary?.(gen);
+                                                    }}
                                                 >
                                                     Vary
                                                 </Button>
@@ -188,10 +204,17 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
 
                                 {/* Header (now Footer) */}
                                 <div className="flex items-start justify-between px-1">
-                                    <p className="text-sm text-gray-400 line-clamp-1 max-w-[70%] font-light tracking-wide" title={gen.prompt}>
+                                    <p className="text-sm text-gray-400 line-clamp-1 max-w-[60%] font-light tracking-wide" title={gen.prompt}>
                                         {gen.prompt}
                                     </p>
-                                    <span className="text-xs bg-white/5 px-2 py-1 rounded text-gray-500">{gen.size}</span>
+                                    <div className="flex items-center gap-2">
+                                        {gen.quality && (
+                                            <span className="text-[10px] bg-purple-500/20 text-purple-200 px-1.5 py-0.5 rounded border border-purple-500/20">
+                                                {QUALITY_LABELS[gen.quality] || "1K"}
+                                            </span>
+                                        )}
+                                        <span className="text-xs bg-white/5 px-2 py-1 rounded text-gray-500">{gen.size}</span>
+                                    </div>
                                 </div>
                             </div>
                         ))}
@@ -262,6 +285,11 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                         <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300 border border-white/5">
                                             {selectedImage.size.replace('x', ':')}
                                         </span>
+                                        {selectedImage.quality && (
+                                            <span className="px-2 py-1 rounded bg-purple-500/10 text-xs text-purple-300 border border-purple-500/20">
+                                                {QUALITY_LABELS[selectedImage.quality] || selectedImage.quality}
+                                            </span>
+                                        )}
                                         <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300 border border-white/5">
                                             Google Nano Banana Pro
                                         </span>
