@@ -1,16 +1,7 @@
 import { useState } from "react";
-import { MoreHorizontal, Download, Copy, Maximize2, RefreshCw, History, Users, LayoutTemplate, X, Sparkles, Folder, Video, Edit2, Share2, Wand2 } from "lucide-react";
+import { MoreHorizontal, Download, Maximize2, RefreshCw, History, Users, LayoutTemplate, X, Sparkles, Folder, Video, Edit2, Share2, Wand2 } from "lucide-react";
 import { Button } from "../ui/button";
-
-interface Generation {
-    id: number;
-    image: string;
-    prompt: string;
-    style: string;
-    size: string;
-    quality?: string;
-    created_at?: string;
-}
+import { Generation } from "@/types";
 
 const QUALITY_LABELS: Record<string, string> = {
     "BASE_1K": "Base 1K",
@@ -117,7 +108,7 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
 
             {/* Feed Content */}
             <div className="flex-1 overflow-y-auto p-6">
-                {generations.length === 0 && !isGenerating ? (
+                {generations.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
                         <div className="bg-white/5 p-4 rounded-full mb-4">
                             <RefreshCw className="h-8 w-8 opacity-50" />
@@ -126,103 +117,109 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {isGenerating && <SkeletonCard />}
-                        {generations.map((gen) => (
-                            <div key={gen.id} className="space-y-3 group">
-                                <div
-                                    className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/5 cursor-zoom-in"
-                                    onClick={() => setSelectedImage(gen)}
-                                >
-                                    <div className="aspect-[4/5] relative">
-                                        <ProgressiveImage src={gen.image} alt={gen.prompt} />
+                        {generations.map((gen) => {
+                            if (gen.status === 'pending') {
+                                return <SkeletonCard key={gen.id} />;
+                            }
+                            if (gen.status === 'failed' || !gen.image) {
+                                return null;
+                            }
+                            return (
+                                <div key={gen.id} className="space-y-3 group">
+                                    <div
+                                        className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/5 cursor-zoom-in"
+                                        onClick={() => setSelectedImage(gen)}
+                                    >
+                                        <div className="aspect-[4/5] relative">
+                                            <ProgressiveImage src={gen.image} alt={gen.prompt} />
 
-                                        {/* Hover Overlay */}
-                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                            {/* Top Left: Selection */}
-                                            <div className="absolute top-3 left-3">
-                                                <div className="w-5 h-5 rounded border border-white/50 bg-black/20 hover:bg-black/40 cursor-pointer" />
-                                            </div>
-
-                                            {/* Top Right: Actions */}
-                                            <div className="absolute top-3 right-3 flex items-center gap-2">
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm">
-                                                    <Folder className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        handleDownload(gen.image, gen.prompt);
-                                                    }}
-                                                >
-                                                    <Download className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-
-                                            {/* Bottom Left: Google Logo */}
-                                            <div className="absolute bottom-3 left-3">
-                                                <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-lg">
-                                                    <span className="font-bold text-black text-xs">G</span>
+                                            {/* Hover Overlay */}
+                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                {/* Top Left: Selection */}
+                                                <div className="absolute top-3 left-3">
+                                                    <div className="w-5 h-5 rounded border border-white/50 bg-black/20 hover:bg-black/40 cursor-pointer" />
                                                 </div>
-                                            </div>
 
-                                            {/* Bottom Right: Primary Actions */}
-                                            <div className="absolute bottom-3 right-3 flex items-center gap-2">
-                                                <Button size="icon" variant="ghost" className="h-9 w-9 rounded-full bg-white text-black hover:bg-gray-200 shadow-lg">
-                                                    <Video className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    size="icon"
-                                                    variant="ghost"
-                                                    className="h-9 w-9 rounded-full bg-white text-black hover:bg-gray-200 shadow-lg"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onEdit?.(gen);
-                                                    }}
-                                                >
-                                                    <Edit2 className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    className="h-9 px-4 rounded-full bg-white text-black hover:bg-gray-200 font-medium shadow-lg"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onVary?.(gen);
-                                                    }}
-                                                >
-                                                    Vary
-                                                </Button>
+                                                {/* Top Right: Actions */}
+                                                <div className="absolute top-3 right-3 flex items-center gap-2">
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm">
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm">
+                                                        <Folder className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleDownload(gen.image, gen.prompt);
+                                                        }}
+                                                    >
+                                                        <Download className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+
+                                                {/* Bottom Left: Google Logo */}
+                                                <div className="absolute bottom-3 left-3">
+                                                    <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-lg">
+                                                        <span className="font-bold text-black text-xs">G</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Bottom Right: Primary Actions */}
+                                                <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                                                    <Button size="icon" variant="ghost" className="h-9 w-9 rounded-full bg-white text-black hover:bg-gray-200 shadow-lg">
+                                                        <Video className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        className="h-9 w-9 rounded-full bg-white text-black hover:bg-gray-200 shadow-lg"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onEdit?.(gen);
+                                                        }}
+                                                    >
+                                                        <Edit2 className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        className="h-9 px-4 rounded-full bg-white text-black hover:bg-gray-200 font-medium shadow-lg"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onVary?.(gen);
+                                                        }}
+                                                    >
+                                                        Vary
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Header (now Footer) */}
-                                <div className="flex items-start justify-between px-1">
-                                    <p className="text-sm text-gray-400 line-clamp-1 max-w-[60%] font-light tracking-wide" title={gen.prompt}>
-                                        {gen.prompt}
-                                    </p>
-                                    <div className="flex items-center gap-2">
-                                        {gen.quality && (
-                                            <span className="text-[10px] bg-purple-500/20 text-purple-200 px-1.5 py-0.5 rounded border border-purple-500/20">
-                                                {QUALITY_LABELS[gen.quality] || "1K"}
-                                            </span>
-                                        )}
-                                        <span className="text-xs bg-white/5 px-2 py-1 rounded text-gray-500">{gen.size}</span>
+                                    {/* Header (now Footer) */}
+                                    <div className="flex items-start justify-between px-1">
+                                        <p className="text-sm text-gray-400 line-clamp-1 max-w-[60%] font-light tracking-wide" title={gen.prompt}>
+                                            {gen.prompt}
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            {gen.quality && (
+                                                <span className="text-[10px] bg-purple-500/20 text-purple-200 px-1.5 py-0.5 rounded border border-purple-500/20">
+                                                    {QUALITY_LABELS[gen.quality] || "1K"}
+                                                </span>
+                                            )}
+                                            <span className="text-xs bg-white/5 px-2 py-1 rounded text-gray-500">{gen.size}</span>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
             </div>
 
-            {/* Lightbox Modal */}
             {/* Lightbox Modal */}
             {selectedImage && (
                 <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>

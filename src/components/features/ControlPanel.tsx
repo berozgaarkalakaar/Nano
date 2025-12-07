@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
     Upload,
     X,
@@ -28,12 +28,14 @@ interface ControlPanelProps {
         aspectRatio?: string;
         quality?: string;
         fixedSeed?: boolean;
+        engine?: "gemini" | "kie";
     }) => Promise<void>;
     isGenerating: boolean;
     isEditMode: boolean;
     setIsEditMode: (value: boolean) => void;
     editImage: string | null;
     setEditImage: (value: string | null) => void;
+    engine?: "gemini" | "kie";
 }
 
 import { Select } from "../ui/select";
@@ -69,9 +71,19 @@ export function ControlPanel({
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [safeMode, setSafeMode] = useState(true);
     const [fixedSeed, setFixedSeed] = useState(false);
+    const [engine, setEngine] = useState<"gemini" | "kie">("kie");
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editImageInputRef = useRef<HTMLInputElement>(null);
+    const promptInputRef = useRef<HTMLTextAreaElement>(null);
+
+    // Auto-resize textarea
+    useEffect(() => {
+        if (promptInputRef.current) {
+            promptInputRef.current.style.height = "auto";
+            promptInputRef.current.style.height = promptInputRef.current.scrollHeight + "px";
+        }
+    }, [prompt, isEditMode]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -133,7 +145,8 @@ export function ControlPanel({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 batchSize: 1 as any, // Edit mode usually 1 at a time
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fixedSeed: fixedSeed as any
+                fixedSeed: fixedSeed as any,
+                engine: engine
             } as any);
         } else {
             onGenerate({
@@ -149,13 +162,14 @@ export function ControlPanel({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 quality: quality as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fixedSeed: fixedSeed as any
+                fixedSeed: fixedSeed as any,
+                engine: engine
             });
         }
     };
 
     return (
-        <div className="w-[400px] flex flex-col h-screen border-r border-white/5 bg-[#0f0f0f] overflow-y-auto">
+        <div className="w-[400px] flex flex-col h-screen glass-panel border-r-0 border-l border-white/5 overflow-y-auto z-10">
             {/* Top Tabs */}
             <div className="flex items-center p-2 border-b border-white/5">
                 <Button
@@ -179,18 +193,18 @@ export function ControlPanel({
             <div className="p-4 space-y-6">
                 {/* Model Selector */}
                 <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">MODEL</Label>
-                    <div className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg border border-white/5">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-white/10 p-1 rounded">
-                                <span className="font-bold text-white text-xs">G</span>
-                            </div>
-                            <span className="text-sm font-medium text-white">
-                                {isEditMode ? "Visual Prompting" : "Google Nano Banana Pro"}
-                            </span>
-                        </div>
-                    </div>
+                    <Label className="text-xs font-semibold text-muted-foreground">ENGINE</Label>
+                    <Select
+                        value={engine}
+                        onChange={(e) => setEngine(e.target.value as "gemini" | "kie")}
+                        className="w-full premium-input border-white/10 text-white"
+                    >
+                        <option value="gemini" className="bg-[#1a1a1a] text-white">Gemini (Google)</option>
+                        <option value="kie" className="bg-[#1a1a1a] text-white">Nano Banana Pro (Kie.ai)</option>
+                    </Select>
                 </div>
+
+
 
                 {isEditMode ? (
                     <div className="space-y-4">
@@ -236,8 +250,9 @@ export function ControlPanel({
                         <div className="space-y-2">
                             <Label className="text-xs font-semibold text-muted-foreground">INSTRUCTION</Label>
                             <Textarea
+                                ref={promptInputRef}
                                 placeholder="e.g. Make it blue, Add a cat..."
-                                className="min-h-[100px] bg-[#1a1a1a] border-white/5 resize-none text-sm"
+                                className="min-h-[60px] max-h-[300px] premium-input border-white/10 text-sm overflow-y-auto"
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
                             />
@@ -292,8 +307,9 @@ export function ControlPanel({
                         <div className="space-y-2 flex-1 flex flex-col">
                             <Label className="text-xs font-semibold text-muted-foreground">PROMPT</Label>
                             <Textarea
+                                ref={promptInputRef}
                                 placeholder="Describe your image"
-                                className="min-h-[120px] bg-[#1a1a1a] border-white/5 resize-none text-sm"
+                                className="min-h-[60px] max-h-[300px] premium-input border-white/10 text-sm overflow-y-auto"
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
                             />
@@ -308,7 +324,7 @@ export function ControlPanel({
                         <Select
                             value={aspectRatio}
                             onChange={(e) => setAspectRatio(e.target.value)}
-                            className="w-full bg-[#1a1a1a] border-white/5 text-white"
+                            className="w-full premium-input border-white/10 text-white"
                         >
                             {ASPECT_RATIOS.map((ratio) => (
                                 <option key={ratio.label} value={ratio.label} className="bg-[#1a1a1a] text-white">
@@ -323,7 +339,7 @@ export function ControlPanel({
                         <Select
                             value={quality}
                             onChange={(e) => setQuality(e.target.value)}
-                            className="w-full bg-[#1a1a1a] border-white/5 text-white"
+                            className="w-full premium-input border-white/10 text-white"
                         >
                             {QUALITIES.map((q) => (
                                 <option key={q.value} value={q.value} className="bg-[#1a1a1a] text-white">
@@ -354,16 +370,7 @@ export function ControlPanel({
                             </Button>
                         </div>
 
-                        <div
-                            className={cn(
-                                "flex items-center rounded-lg border px-2 py-1 gap-2 cursor-pointer ml-auto",
-                                safeMode ? "bg-[#1a1a1a] border-white/5 text-green-500" : "bg-red-900/20 border-red-900/50 text-red-500"
-                            )}
-                            onClick={() => setSafeMode(!safeMode)}
-                        >
-                            <Infinity className="h-4 w-4" />
-                            <span className="text-xs font-bold">{safeMode ? "ON" : "OFF"}</span>
-                        </div>
+
                     </div>
 
                     {/* Fixed Seed Toggle */}
@@ -390,7 +397,7 @@ export function ControlPanel({
                 </div>
 
                 <Button
-                    className="w-full bg-white text-black hover:bg-gray-200 h-12 text-base font-semibold"
+                    className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 text-white h-12 text-base font-bold shadow-lg shadow-purple-500/20 transition-all duration-300 transform hover:scale-[1.02]"
                     onClick={handleSubmit}
                     disabled={isGenerating || !prompt || (isEditMode && !editImage)}
                 >

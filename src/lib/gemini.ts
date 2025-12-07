@@ -125,7 +125,7 @@ export async function generateBaseImageWithGemini(params: GenerateBaseImageParam
                     imageConfig: {
                         aspectRatio: params.aspectRatio || "1:1",
                         imageSize: params.imageSize || "1K",
-                        // seed: seed // Uncomment if supported
+                        seed: seed
                     }
                 } as any
             });

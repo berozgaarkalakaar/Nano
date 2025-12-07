@@ -20,7 +20,7 @@ interface SidebarProps {
 
 export function Sidebar({ onAssistantClick }: SidebarProps) {
     return (
-        <div className="w-64 h-screen bg-[#0f0f0f] border-r border-white/5 flex flex-col flex-shrink-0">
+        <div className="w-64 h-screen glass-panel border-r-0 flex flex-col flex-shrink-0 z-20 relative">
             {/* Logo */}
             <div className="p-4 flex items-center gap-2">
                 <div className="bg-orange-600 p-1.5 rounded-lg">
@@ -33,8 +33,6 @@ export function Sidebar({ onAssistantClick }: SidebarProps) {
             <div className="px-2 py-2 space-y-1">
                 <NavItem icon={Home} label="Home" />
                 <NavItem icon={Sparkles} label="AI Suite" active />
-                <NavItem icon={Search} label="Stock" />
-                <NavItem icon={Users} label="Community" />
             </div>
 
             <div className="px-4 py-2">
@@ -47,9 +45,6 @@ export function Sidebar({ onAssistantClick }: SidebarProps) {
                 <div className="space-y-1">
                     <NavItem icon={ImageIcon} label="Image Generator" activeVariant />
                     <NavItem icon={Bot} label="Assistant" onClick={onAssistantClick} />
-                    <NavItem icon={Video} label="Video Generator" />
-                    <NavItem icon={LayoutGrid} label="All tools" />
-                    <NavItem icon={Sparkles} label="Google AI Studio" href="https://aistudio.google.com/" />
                 </div>
             </div>
 
@@ -58,18 +53,6 @@ export function Sidebar({ onAssistantClick }: SidebarProps) {
             {/* Bottom Nav */}
             <div className="px-2 py-4 space-y-1">
                 <NavItem icon={History} label="History" href="/history" />
-                <div className="flex items-center justify-between px-3 py-2 text-muted-foreground hover:text-white cursor-pointer rounded-lg hover:bg-white/5 transition-colors">
-                    <div className="flex items-center gap-3">
-                        <HelpCircle className="h-5 w-5" />
-                        <span className="text-sm font-medium">Help</span>
-                    </div>
-                </div>
-                <div className="flex items-center justify-between px-3 py-2 text-muted-foreground hover:text-white cursor-pointer rounded-lg hover:bg-white/5 transition-colors">
-                    <div className="flex items-center gap-3">
-                        <Settings className="h-5 w-5" />
-                        <span className="text-sm font-medium">Settings</span>
-                    </div>
-                </div>
             </div>
         </div>
     );
