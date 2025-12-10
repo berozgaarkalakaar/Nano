@@ -31,6 +31,8 @@ An advanced AI image generator powered by Google's Gemini 3 Pro Image model.
    Create a `.env` file in the root directory and add your Gemini API key:
    ```env
    GEMINI_API_KEY=your_api_key_here
+   KIE_API_KEY=your_kie_api_key_here
+   FAL_KEY=your_fal_key_here
    ```
 
 3. Run the development server:

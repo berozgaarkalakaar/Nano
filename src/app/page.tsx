@@ -92,7 +92,7 @@ export default function Home() {
     editImage?: string;
     editInstruction?: string;
     batchSize?: number;
-    engine?: "gemini" | "kie";
+    engine?: "gemini" | "kie" | "fal";
     aspectRatio?: string;
     quality?: string;
   }) => {

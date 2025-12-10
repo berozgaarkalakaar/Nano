@@ -28,14 +28,14 @@ interface ControlPanelProps {
         aspectRatio?: string;
         quality?: string;
         fixedSeed?: boolean;
-        engine?: "gemini" | "kie";
+        engine?: "gemini" | "kie" | "fal";
     }) => Promise<void>;
     isGenerating: boolean;
     isEditMode: boolean;
     setIsEditMode: (value: boolean) => void;
     editImage: string | null;
     setEditImage: (value: string | null) => void;
-    engine?: "gemini" | "kie";
+    engine?: "gemini" | "kie" | "fal";
 }
 
 import { Select } from "../ui/select";
@@ -71,7 +71,7 @@ export function ControlPanel({
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [safeMode, setSafeMode] = useState(true);
     const [fixedSeed, setFixedSeed] = useState(false);
-    const [engine, setEngine] = useState<"gemini" | "kie">("kie");
+    const [engine, setEngine] = useState<"gemini" | "kie" | "fal">("kie");
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editImageInputRef = useRef<HTMLInputElement>(null);
@@ -196,11 +196,12 @@ export function ControlPanel({
                     <Label className="text-xs font-semibold text-muted-foreground">ENGINE</Label>
                     <Select
                         value={engine}
-                        onChange={(e) => setEngine(e.target.value as "gemini" | "kie")}
+                        onChange={(e) => setEngine(e.target.value as "gemini" | "kie" | "fal")}
                         className="w-full premium-input border-white/10 text-white"
                     >
                         <option value="gemini" className="bg-[#1a1a1a] text-white">Gemini (Google)</option>
                         <option value="kie" className="bg-[#1a1a1a] text-white">Nano Banana Pro (Kie.ai)</option>
+                        <option value="fal" className="bg-[#1a1a1a] text-white">Nano Banana Pro (Fal.ai)</option>
                     </Select>
                 </div>
 
