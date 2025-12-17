@@ -33,6 +33,7 @@ interface GenerateBaseImageParams {
     editInstruction?: string;
     fixedObjects?: Record<string, boolean>;
     fixedSeed?: boolean;
+    seed?: number;
 }
 
 interface BaseImageResult {
@@ -94,8 +95,8 @@ export async function generateBaseImageWithGemini(params: GenerateBaseImageParam
     }
 
     // Calculate seed if needed
-    let seed: number | undefined;
-    if (params.fixedSeed) {
+    let seed: number | undefined = params.seed;
+    if (seed === undefined && params.fixedSeed) {
         const str = fullPrompt + (params.style || "");
         let hash = 0;
         for (let i = 0; i < str.length; i++) {

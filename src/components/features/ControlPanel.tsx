@@ -8,7 +8,13 @@ import {
     Sparkles,
     Minus,
     Plus,
-    Infinity
+
+    Camera,
+    MousePointer,
+    Type,
+    RotateCw,
+    Maximize,
+    MoveVertical
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
@@ -36,6 +42,7 @@ interface ControlPanelProps {
     editImage: string | null;
     setEditImage: (value: string | null) => void;
     engine?: "gemini" | "kie" | "fal";
+    initialPrompt?: string;
 }
 
 import { Select } from "../ui/select";
@@ -62,22 +69,47 @@ export function ControlPanel({
     isEditMode,
     setIsEditMode,
     editImage,
-    setEditImage
+    setEditImage,
+    initialPrompt
 }: ControlPanelProps) {
-    const [prompt, setPrompt] = useState("");
-    const [aspectRatio, setAspectRatio] = useState("1:1");
+    const [prompt, setPrompt] = useState(initialPrompt || "");
+    const [aspectRatio, setAspectRatio] = useState("4:5");
     const [quality, setQuality] = useState("BASE_1K");
     const [batchSize, setBatchSize] = useState(1);
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
-    const [safeMode, setSafeMode] = useState(true);
+
     const [fixedSeed, setFixedSeed] = useState(false);
     const [engine, setEngine] = useState<"gemini" | "kie" | "fal">("kie");
+
+    const [activeTab, setActiveTab] = useState<"prompt" | "visual" | "camera">("prompt");
+    const [annotations, setAnnotations] = useState<{ x: number; y: number; text: string }[]>([]);
+    const [camera, setCamera] = useState({ rotate: 0, vertical: 0, closeup: 0 });
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const editImageInputRef = useRef<HTMLInputElement>(null);
     const promptInputRef = useRef<HTMLTextAreaElement>(null);
+    const imageContainerRef = useRef<HTMLDivElement>(null);
 
     // Auto-resize textarea
+    useEffect(() => {
+        if (promptInputRef.current) {
+            // ... existing code ...
+        }
+    }, [prompt, isEditMode, activeTab]);
+
+    const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (activeTab !== "visual" || !editImage || !imageContainerRef.current) return;
+
+        const rect = imageContainerRef.current.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) / rect.width) * 100;
+        const y = ((e.clientY - rect.top) / rect.height) * 100;
+
+        const text = window.prompt("Enter annotation:");
+        if (text) {
+            setAnnotations(prev => [...prev, { x, y, text }]);
+        }
+    };
+
     useEffect(() => {
         if (promptInputRef.current) {
             promptInputRef.current.style.height = "auto";
@@ -97,6 +129,12 @@ export function ControlPanel({
             });
         }
     };
+
+    useEffect(() => {
+        if (initialPrompt) {
+            setPrompt(initialPrompt);
+        }
+    }, [initialPrompt]);
 
     const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
@@ -132,8 +170,31 @@ export function ControlPanel({
         }
 
         if (isEditMode && editImage) {
+            // Construct visual edits prompt
+            let augmentedPrompt = ""; // If user left prompt empty, we build one. If not, we append.
+
+            // Add annotations
+            if (annotations.length > 0) {
+                const notes = annotations.map(a => {
+                    let pos = "";
+                    if (a.y < 33) pos += "Top"; else if (a.y > 66) pos += "Bottom"; else pos += "Center";
+                    if (a.x < 33) pos += " Left"; else if (a.x > 66) pos += " Right";
+                    return `${pos.trim()}: ${a.text}`;
+                }).join(", ");
+                augmentedPrompt += ` Annotations: ${notes}.`;
+            }
+
+            // Add camera
+            if (camera.rotate !== 0 || camera.vertical !== 0 || camera.closeup > 0) {
+                augmentedPrompt += ` Camera details: ${camera.rotate} deg rotation, ${camera.vertical} deg vertical angle, ${camera.closeup}% closeup.`;
+            }
+
+            const finalPrompt = prompt ? `${prompt} ${augmentedPrompt}` : augmentedPrompt;
+
+            console.log("Augmented Prompt:", finalPrompt);
+
             onGenerate({
-                prompt: "",
+                prompt: "", // logic handles instruction in editInstruction
                 width,
                 height,
                 referenceImages: [],
@@ -141,9 +202,9 @@ export function ControlPanel({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 editImage: editImage as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                editInstruction: prompt as any,
+                editInstruction: finalPrompt as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                batchSize: 1 as any, // Edit mode usually 1 at a time
+                batchSize: 1 as any,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 fixedSeed: fixedSeed as any,
                 engine: engine
@@ -155,14 +216,10 @@ export function ControlPanel({
                 height,
                 referenceImages,
                 fixedObjects: {},
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                batchSize: batchSize as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                aspectRatio: aspectRatio as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                quality: quality as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fixedSeed: fixedSeed as any,
+                batchSize: batchSize,
+                aspectRatio: aspectRatio,
+                quality: quality,
+                fixedSeed: fixedSeed,
                 engine: engine
             });
         }
@@ -209,28 +266,77 @@ export function ControlPanel({
 
                 {isEditMode ? (
                     <div className="space-y-4">
+                        {/* Edit Mode Tabs */}
+                        <div className="flex bg-[#1a1a1a] p-1 rounded-lg border border-white/5">
+                            <button
+                                onClick={() => setActiveTab("prompt")}
+                                className={cn("flex-1 text-xs py-1.5 rounded transition-all", activeTab === "prompt" ? "bg-white/10 text-white font-medium" : "text-muted-foreground hover:text-white")}
+                            >
+                                <Type className="h-3 w-3 inline mr-1" />
+                                Prompt
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("visual")}
+                                className={cn("flex-1 text-xs py-1.5 rounded transition-all", activeTab === "visual" ? "bg-white/10 text-white font-medium" : "text-muted-foreground hover:text-white")}
+                            >
+                                <MousePointer className="h-3 w-3 inline mr-1" />
+                                Visual
+                            </button>
+                            <button
+                                onClick={() => setActiveTab("camera")}
+                                className={cn("flex-1 text-xs py-1.5 rounded transition-all", activeTab === "camera" ? "bg-white/10 text-white font-medium" : "text-muted-foreground hover:text-white")}
+                            >
+                                <Camera className="h-3 w-3 inline mr-1" />
+                                Camera
+                            </button>
+                        </div>
+
+                        {/* Image Preview (Always visible in Edit Mode, but interactive in Visual) */}
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-muted-foreground">IMAGE TO EDIT</Label>
+                            <Label className="text-xs font-semibold text-muted-foreground">IMAGE</Label>
                             <div
-                                className="border border-dashed border-white/10 rounded-lg p-8 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-white/5 transition-colors"
-                                onClick={() => editImageInputRef.current?.click()}
+                                ref={imageContainerRef}
+                                className={cn(
+                                    "border border-dashed border-white/10 rounded-lg flex flex-col items-center justify-center relative overflow-hidden transition-colors",
+                                    !editImage && "p-8 cursor-pointer hover:bg-white/5",
+                                    editImage && activeTab === "visual" && "cursor-crosshair ring-1 ring-blue-500/50"
+                                )}
+                                onClick={!editImage ? () => editImageInputRef.current?.click() : handleImageClick}
                             >
                                 {editImage ? (
-                                    <div className="relative w-full aspect-video">
+                                    <div className="relative w-full aspect-video bg-black/50">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={editImage} alt="Edit Target" className="w-full h-full object-contain" />
+                                        <img src={editImage} alt="Edit Target" className="w-full h-full object-contain pointer-events-none select-none" />
+
+                                        {/* Remove Button */}
                                         <Button
                                             size="icon"
                                             variant="destructive"
-                                            className="absolute top-2 right-2 h-6 w-6"
+                                            className="absolute top-2 right-2 h-6 w-6 z-10"
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 setEditImage(null);
+                                                setAnnotations([]);
                                             }}
                                             aria-label="Remove image"
                                         >
                                             <X className="h-3 w-3" />
                                         </Button>
+
+                                        {/* Annotations Overlay */}
+                                        {annotations.map((a, i) => (
+                                            <div
+                                                key={i}
+                                                className="absolute w-4 h-4 -ml-2 -mt-2 bg-blue-500 rounded-full border border-white shadow-lg flex items-center justify-center text-[8px] font-bold text-white z-0 group"
+                                                style={{ left: `${a.x}%`, top: `${a.y}%` }}
+                                            >
+                                                {i + 1}
+                                                {/* Tooltip */}
+                                                <div className="absolute top-full text-[10px] mt-1 bg-black/80 px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {a.text}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
                                 ) : (
                                     <>
@@ -248,16 +354,87 @@ export function ControlPanel({
                                 />
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-muted-foreground">INSTRUCTION</Label>
-                            <Textarea
-                                ref={promptInputRef}
-                                placeholder="e.g. Make it blue, Add a cat..."
-                                className="min-h-[60px] max-h-[300px] premium-input border-white/10 text-sm overflow-y-auto"
-                                value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
-                            />
-                        </div>
+
+                        {/* Tab Content */}
+                        {activeTab === "prompt" && (
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-muted-foreground">INSTRUCTION</Label>
+                                <Textarea
+                                    ref={promptInputRef}
+                                    placeholder="e.g. Make it blue, Add a cat..."
+                                    className="min-h-[60px] max-h-[300px] premium-input border-white/10 text-sm overflow-y-auto"
+                                    value={prompt}
+                                    onChange={(e) => setPrompt(e.target.value)}
+                                />
+                            </div>
+                        )}
+
+                        {activeTab === "visual" && (
+                            <div className="bg-[#1a1a1a] rounded-lg p-3 text-[10px] text-muted-foreground border border-white/5">
+                                <p>Click on the image above to add an annotation (e.g. &quot;Change this&quot;). These will be added to your prompt.</p>
+                                <div className="mt-2 space-y-1">
+                                    {annotations.map((a, i) => (
+                                        <div key={i} className="flex items-center gap-2">
+                                            <span className="bg-blue-500 text-white w-3 h-3 rounded-full flex items-center justify-center text-[8px]">{i + 1}</span>
+                                            <span className="text-white">{a.text}</span>
+                                            <button onClick={() => setAnnotations(prev => prev.filter((_, idx) => idx !== i))} className="ml-auto text-red-400 hover:text-red-300">
+                                                <X className="h-3 w-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === "camera" && (
+                            <div className="space-y-4 bg-[#1a1a1a] p-3 rounded-lg border border-white/5">
+                                {/* Rotate */}
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1"><RotateCw className="h-3 w-3" /> Rotate</span>
+                                        <span className="text-white">{camera.rotate}°</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="-45"
+                                        max="45"
+                                        value={camera.rotate}
+                                        onChange={(e) => setCamera(prev => ({ ...prev, rotate: parseInt(e.target.value) }))}
+                                        className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                {/* Vertical */}
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1"><MoveVertical className="h-3 w-3" /> Vertical</span>
+                                        <span className="text-white">{camera.vertical}°</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="-90"
+                                        max="90"
+                                        value={camera.vertical}
+                                        onChange={(e) => setCamera(prev => ({ ...prev, vertical: parseInt(e.target.value) }))}
+                                        className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                                {/* Closeup */}
+                                <div className="space-y-1">
+                                    <div className="flex justify-between text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1"><Maximize className="h-3 w-3" /> Closeup</span>
+                                        <span className="text-white">{camera.closeup}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        value={camera.closeup}
+                                        onChange={(e) => setCamera(prev => ({ ...prev, closeup: parseInt(e.target.value) }))}
+                                        className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     <>
@@ -289,12 +466,23 @@ export function ControlPanel({
                                 </div>
 
                                 {referenceImages.map((img, i) => (
-                                    <div key={i} className="relative rounded-lg overflow-hidden aspect-square group">
+                                    <div
+                                        key={i}
+                                        className="relative rounded-lg overflow-hidden aspect-square group cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all"
+                                        onClick={() => setPrompt(prev => prev + (prev.length > 0 && !prev.endsWith(" ") ? " " : "") + `@img${i + 1}`)}
+                                        title="Click to add tag to prompt"
+                                    >
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
                                         <img src={img} alt="Ref" className="w-full h-full object-cover" />
+                                        <div className="absolute bottom-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm pointer-events-none">
+                                            @img{i + 1}
+                                        </div>
                                         <button
-                                            onClick={() => setReferenceImages(prev => prev.filter((_, idx) => idx !== i))}
-                                            className="absolute top-1 right-1 bg-black/50 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent adding tag when deleting
+                                                setReferenceImages(prev => prev.filter((_, idx) => idx !== i));
+                                            }}
+                                            className="absolute top-1 right-1 bg-black/50 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
                                             aria-label="Remove image"
                                         >
                                             <X className="h-3 w-3 text-white" />
@@ -387,7 +575,7 @@ export function ControlPanel({
                             >
                                 <div className={cn(
                                     "absolute top-0.5 w-3 h-3 rounded-full bg-black transition-all",
-                                    fixedSeed ? "left-4.5" : "left-0.5"
+                                    fixedSeed ? "left-[18px]" : "left-0.5"
                                 )} />
                             </div>
                         </div>

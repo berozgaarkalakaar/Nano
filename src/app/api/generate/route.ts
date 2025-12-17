@@ -55,6 +55,19 @@ export async function POST(req: NextRequest) {
         let finalWidth = width || 1024;
         let finalHeight = height || 1024;
 
+        // Calculate Seed if Fixed
+        let seed: number | undefined;
+        if (fixedSeed) {
+            const str = (prompt || "") + (style || "");
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) {
+                const char = str.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash;
+            }
+            seed = Math.abs(hash);
+        }
+
         if (engine === "kie") {
             try {
                 // Map Nano Banana Pro parameters
@@ -63,7 +76,7 @@ export async function POST(req: NextRequest) {
                 if (quality === "ULTRA_4K") resolution = "4K";
 
                 // Map Aspect Ratio strict validation
-                const validRatios = ["1:1", "16:9", "9:16", "4:3", "3:4"];
+                const validRatios = ["1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "4:5", "21:9"];
                 const ar = validRatios.includes(aspectRatio) ? aspectRatio : "1:1";
 
                 finalImage = await generateImageWithKie({
@@ -71,7 +84,8 @@ export async function POST(req: NextRequest) {
                     aspectRatio: ar as any,
                     resolution: resolution,
                     outputFormat: "png",
-                    imageInput: referenceImages
+                    imageInput: referenceImages,
+                    seed: seed
                 });
 
                 // Estimates
@@ -80,13 +94,13 @@ export async function POST(req: NextRequest) {
 
             } catch (kieError: any) {
                 console.error("Kie Generation Failed:", kieError);
-                throw kieError;
+                console.log("Falling back to Gemini...");
+                // Allow fallthrough to Gemini by not throwing and ensuring finalImage is empty
             }
-
         } else if (engine === "fal") {
             try {
                 console.log("Using Fal.ai engine...");
-                const validRatios = ["1:1", "16:9", "9:16", "4:3", "3:4"];
+                const validRatios = ["1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "4:5", "21:9"];
                 const ar = validRatios.includes(aspectRatio) ? aspectRatio : "1:1";
 
                 finalImage = await generateImageWithFal({
@@ -99,8 +113,11 @@ export async function POST(req: NextRequest) {
                 console.error("Fal Generation Failed:", falError);
                 throw falError;
             }
-        } else {
-            // Gemini Logic
+        }
+
+        // Gemini Logic (Default or Fallback)
+        if (!finalImage) {
+            console.log("Generating with Gemini (Default or Fallback)...");
             let baseImageSize = "1K";
             if (quality === "HIRES_2K" || quality === "ULTRA_4K") {
                 baseImageSize = "2K";
@@ -117,7 +134,8 @@ export async function POST(req: NextRequest) {
                 editImage,
                 editInstruction,
                 fixedObjects,
-                fixedSeed: !!fixedSeed
+                fixedSeed: !!fixedSeed,
+                seed: seed
             });
 
             finalImage = baseResult.image;

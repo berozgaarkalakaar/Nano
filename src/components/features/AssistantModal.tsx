@@ -50,7 +50,42 @@ export function AssistantModal({ isOpen, onClose }: AssistantModalProps) {
         }
     }, [messages, isOpen]);
 
-    // ... (rest of the component)
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const urls = files.map(file => URL.createObjectURL(file));
+            setAttachedImages(prev => [...prev, ...urls]);
+        }
+    };
+
+    const handleSend = async () => {
+        if (!input.trim() && attachedImages.length === 0) return;
+
+        const userMsg: Message = {
+            id: Date.now().toString(),
+            role: "user",
+            content: input,
+            images: attachedImages,
+            timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, userMsg]);
+        setInput("");
+        setAttachedImages([]);
+        setIsTyping(true);
+
+        // Dummy response simulation
+        setTimeout(() => {
+            const aiMsg: Message = {
+                id: (Date.now() + 1).toString(),
+                role: "assistant",
+                content: "I'm meant to help you, but I'm currently a mock implementation. Please connect me to a real backend!",
+                timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMsg]);
+            setIsTyping(false);
+        }, 1500);
+    };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && !e.shiftKey) {

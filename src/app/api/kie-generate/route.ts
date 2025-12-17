@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
         // 6. Save to History
         // We'll use the existing 'generations' table.
         // Map Kie resolution to size string if possible, or use the requested resolution.
-        const sizeStr = result.resolution === "4K" ? "4096x4096" : (result.resolution === "2K" ? "2048x2048" : "1024x1024");
+        const reqResolution = resolution || "1K";
+        const sizeStr = reqResolution === "4K" ? "4096x4096" : (reqResolution === "2K" ? "2048x2048" : "1024x1024");
 
         const insertStmt = db.prepare(`
             INSERT INTO generations (user_id, prompt, style, size, image_url, quality)
@@ -69,15 +70,15 @@ export async function POST(req: NextRequest) {
             prompt,
             "Nano Banana Pro", // Style
             sizeStr, // Size
-            result.imageUrl,
-            result.resolution // Quality
+            result, // result is the image URL string now
+            reqResolution // Quality
         );
 
         return NextResponse.json({
             success: true,
-            imageUrl: result.imageUrl,
-            aspectRatio: result.aspectRatio,
-            resolution: result.resolution,
+            imageUrl: result,
+            aspectRatio: aspectRatio,
+            resolution: reqResolution,
             credits: credits.amount - 1,
         });
     } catch (error: any) {

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { MoreHorizontal, Download, Maximize2, RefreshCw, History, Users, LayoutTemplate, X, Sparkles, Folder, Video, Edit2, Share2, Wand2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Generation } from "@/types";
+import { ProgressiveImage } from "../ui/ProgressiveImage";
+import { Lightbox } from "../ui/Lightbox";
 
 const QUALITY_LABELS: Record<string, string> = {
     "BASE_1K": "Base 1K",
@@ -39,27 +41,7 @@ function SkeletonCard() {
     );
 }
 
-function ProgressiveImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
-    const [isLoading, setIsLoading] = useState(true);
 
-    return (
-        <div className={`relative overflow-hidden ${className?.includes("h-") ? "" : "w-full h-full"} bg-black/50`}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-                src={src}
-                alt={alt}
-                className={`w-full h-full transition-all duration-[2000ms] ease-out ${isLoading ? "scale-110 blur-xl grayscale opacity-0" : "scale-100 blur-0 grayscale-0 opacity-100"
-                    } ${className || "object-cover"}`}
-                onLoad={() => setIsLoading(false)}
-            />
-            {isLoading && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-full h-full bg-white/5 animate-pulse" />
-                </div>
-            )}
-        </div>
-    );
-}
 
 export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
     // ... existing handlers ...
@@ -154,7 +136,7 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                                         className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleDownload(gen.image, gen.prompt);
+                                                            handleDownload(gen.image || "", gen.prompt);
                                                         }}
                                                     >
                                                         <Download className="h-4 w-4" />
@@ -228,7 +210,7 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                         {/* Left: Image Area */}
                         <div className="flex-1 relative flex items-center justify-center bg-[#090909] p-8">
                             <ProgressiveImage
-                                src={selectedImage.image}
+                                src={selectedImage.image || ""}
                                 alt={selectedImage.prompt}
                                 className="max-w-full max-h-full object-contain shadow-2xl"
                             />
@@ -250,7 +232,7 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                     <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">
                                         <Share2 className="h-4 w-4" />
                                     </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => handleDownload(selectedImage.image, selectedImage.prompt)}>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => handleDownload(selectedImage.image || "", selectedImage.prompt)}>
                                         <Download className="h-4 w-4" />
                                     </Button>
                                     <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">

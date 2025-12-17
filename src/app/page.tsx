@@ -1,17 +1,34 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ControlPanel } from "@/components/features/ControlPanel";
 import { Feed } from "@/components/features/Feed";
 import { Generation } from "@/types";
 import { AssistantModal } from "@/components/features/AssistantModal";
 
-export default function Home() {
+function HomeContent() {
   const [generations, setGenerations] = useState<Generation[]>([]);
   const [isEditMode, setIsEditMode] = useState(false);
   const [editImage, setEditImage] = useState<string | null>(null);
+  const [initialPrompt, setInitialPrompt] = useState("");
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const editImgObj = searchParams.get("editImage");
+    const promptObj = searchParams.get("prompt");
+
+    if (editImgObj) {
+      setEditImage(editImgObj);
+      setIsEditMode(true);
+    }
+    if (promptObj) {
+      setInitialPrompt(promptObj);
+    }
+  }, [searchParams]);
 
   // Queue System
   const [activeRequests, setActiveRequests] = useState(0);
@@ -95,6 +112,8 @@ export default function Home() {
     engine?: "gemini" | "kie" | "fal";
     aspectRatio?: string;
     quality?: string;
+    fixedSeed?: boolean;
+    seed?: number;
   }) => {
     const count = data.batchSize || 1;
     const newTasks: { id: number; data: any }[] = [];
@@ -130,9 +149,18 @@ export default function Home() {
         setIsEditMode={setIsEditMode}
         editImage={editImage}
         setEditImage={setEditImage}
+        initialPrompt={initialPrompt}
       />
       <Feed generations={generations} onEdit={handleEdit} isGenerating={activeRequests > 0} />
       <AssistantModal isOpen={isAssistantOpen} onClose={() => setIsAssistantOpen(false)} />
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="flex h-screen items-center justify-center bg-black text-white">Loading...</div>}>
+      <HomeContent />
+    </Suspense>
   );
 }
