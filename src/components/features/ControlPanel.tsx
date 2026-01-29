@@ -117,6 +117,50 @@ export function ControlPanel({
         }
     }, [prompt, isEditMode]);
 
+    // Clear annotations when editImage changes
+    useEffect(() => {
+        setAnnotations([]);
+    }, [editImage]);
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const handleEditImageDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const file = e.dataTransfer.files[0];
+            if (!file.type.startsWith('image/')) return;
+
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditImage(reader.result as string);
+                // Annotations are cleared by the useEffect
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleReferenceImageDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (e.dataTransfer.files) {
+            const files = Array.from(e.dataTransfer.files);
+            files.forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setReferenceImages(prev => [...prev, reader.result as string]);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             const files = Array.from(e.target.files);
@@ -135,6 +179,20 @@ export function ControlPanel({
             setPrompt(initialPrompt);
         }
     }, [initialPrompt]);
+
+    // Keyboard Shortcut: Cmd/Ctrl + Enter to Generate
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                e.preventDefault();
+                handleSubmit();
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [prompt, isEditMode, editImage, annotations, camera, aspectRatio, quality, batchSize, referenceImages, fixedSeed, engine]);
 
     const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.[0]) {
@@ -171,7 +229,7 @@ export function ControlPanel({
 
         if (isEditMode && editImage) {
             // Construct visual edits prompt
-            let augmentedPrompt = ""; // If user left prompt empty, we build one. If not, we append.
+            let augmentedPrompt = "";
 
             // Add annotations
             if (annotations.length > 0) {
@@ -189,26 +247,20 @@ export function ControlPanel({
                 augmentedPrompt += ` Camera details: ${camera.rotate} deg rotation, ${camera.vertical} deg vertical angle, ${camera.closeup}% closeup.`;
             }
 
-            const finalPrompt = prompt ? `${prompt} ${augmentedPrompt}` : augmentedPrompt;
-
-            console.log("Augmented Prompt:", finalPrompt);
+            console.log("Augmented Instruction:", augmentedPrompt);
 
             onGenerate({
-                prompt: "", // logic handles instruction in editInstruction
+                prompt: prompt,
                 width,
                 height,
-                referenceImages: [],
+                referenceImages: referenceImages,
                 fixedObjects: {},
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                editImage: editImage as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                editInstruction: finalPrompt as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                batchSize: 1 as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                fixedSeed: fixedSeed as any,
+                editImage: editImage,
+                editInstruction: augmentedPrompt.trim(),
+                batchSize: 1,
+                fixedSeed: fixedSeed,
                 engine: engine
-            } as any);
+            });
         } else {
             onGenerate({
                 prompt,
@@ -302,6 +354,8 @@ export function ControlPanel({
                                     editImage && activeTab === "visual" && "cursor-crosshair ring-1 ring-blue-500/50"
                                 )}
                                 onClick={!editImage ? () => editImageInputRef.current?.click() : handleImageClick}
+                                onDragOver={handleDragOver}
+                                onDrop={handleEditImageDrop}
                             >
                                 {editImage ? (
                                     <div className="relative w-full aspect-video bg-black/50">
@@ -435,6 +489,49 @@ export function ControlPanel({
                                 </div>
                             </div>
                         )}
+
+                        {/* References (Edit Mode) */}
+                        <div className="space-y-2 relative">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-semibold text-muted-foreground">REFERENCES</Label>
+                                <Button variant="ghost" size="sm" className="h-6 text-blue-400 hover:text-blue-300 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
+                                    <Plus className="h-3 w-3" /> Add
+                                </Button>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2"
+                                onDragOver={handleDragOver}
+                                onDrop={handleReferenceImageDrop}
+                            >
+                                {referenceImages.map((img, i) => (
+                                    <div
+                                        key={i}
+                                        className="relative rounded-lg overflow-hidden aspect-square group cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all"
+                                        // onClick={() => setPrompt(prev => prev + (prev.length > 0 && !prev.endsWith(" ") ? " " : "") + `@img${i + 1}`)}
+                                        title="Reference Image"
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={img} alt="Ref" className="w-full h-full object-cover" />
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation(); // Prevent adding tag when deleting
+                                                setReferenceImages(prev => prev.filter((_, idx) => idx !== i));
+                                            }}
+                                            className="absolute top-1 right-1 bg-black/50 p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/80"
+                                            aria-label="Remove image"
+                                        >
+                                            <X className="h-3 w-3 text-white" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <div
+                                    className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <Upload className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 ) : (
                     <>
@@ -445,18 +542,12 @@ export function ControlPanel({
                                 <Button variant="ghost" size="sm" className="h-6 text-blue-400 hover:text-blue-300 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
                                     <Plus className="h-3 w-3" /> Add
                                 </Button>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    multiple
-                                    accept="image/*"
-                                    onChange={handleFileChange}
-                                    aria-label="Upload reference images"
-                                />
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2">
+                            <div className="grid grid-cols-3 gap-2"
+                                onDragOver={handleDragOver}
+                                onDrop={handleReferenceImageDrop}
+                            >
                                 <div
                                     className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
                                     onClick={() => fileInputRef.current?.click()}
@@ -602,6 +693,17 @@ export function ControlPanel({
                         </>
                     )}
                 </Button>
+
+                {/* Hidden File Input for References - Always Rendered */}
+                <input
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    aria-label="Upload reference images"
+                />
             </div>
         </div>
     );

@@ -5,6 +5,8 @@ import { generateBaseImageWithGemini } from "@/lib/gemini";
 import { upscaleImage } from "@/lib/upscaler";
 import { generateImageWithKie } from "@/lib/kie";
 import { generateImageWithFal } from "@/lib/fal";
+import fs from "fs";
+import path from "path";
 
 export async function POST(req: NextRequest) {
     try {
@@ -79,12 +81,17 @@ export async function POST(req: NextRequest) {
                 const validRatios = ["1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "4:5", "21:9"];
                 const ar = validRatios.includes(aspectRatio) ? aspectRatio : "1:1";
 
+                const imageInputs = referenceImages || [];
+                if (editImage) {
+                    imageInputs.unshift(editImage);
+                }
+
                 finalImage = await generateImageWithKie({
                     prompt: editInstruction ? `${prompt} . ${editInstruction}` : prompt,
-                    aspectRatio: ar as any,
+                    aspectRatio: ar as "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "2:3" | "3:2" | "4:5" | "21:9",
                     resolution: resolution,
                     outputFormat: "png",
-                    imageInput: referenceImages,
+                    imageInput: imageInputs,
                     seed: seed
                 });
 
@@ -92,7 +99,7 @@ export async function POST(req: NextRequest) {
                 finalWidth = resolution === "4K" ? 4096 : (resolution === "2K" ? 2048 : 1024);
                 finalHeight = finalWidth; // Simplified for square, could infer from AR
 
-            } catch (kieError: any) {
+            } catch (kieError: unknown) {
                 console.error("Kie Generation Failed:", kieError);
                 console.log("Falling back to Gemini...");
                 // Allow fallthrough to Gemini by not throwing and ensuring finalImage is empty
@@ -103,13 +110,21 @@ export async function POST(req: NextRequest) {
                 const validRatios = ["1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "4:5", "21:9"];
                 const ar = validRatios.includes(aspectRatio) ? aspectRatio : "1:1";
 
+                const imageInputs = referenceImages || [];
+                if (editImage) {
+                    // Fal typically expects the init image as the primary image_url or first in list
+                    // Depending on the specific model endpoint, correct field might vary.
+                    // Assuming imageInput array handles it.
+                    imageInputs.unshift(editImage);
+                }
+
                 finalImage = await generateImageWithFal({
                     prompt: editInstruction ? `${prompt} . ${editInstruction}` : prompt,
-                    aspectRatio: ar as any,
-                    imageInput: referenceImages
+                    aspectRatio: ar as "1:1" | "16:9" | "9:16" | "4:3" | "3:4",
+                    imageInput: imageInputs
                 });
                 // Fal usually returns 1024x1024 or similar for default
-            } catch (falError: any) {
+            } catch (falError: unknown) {
                 console.error("Fal Generation Failed:", falError);
                 throw falError;
             }
@@ -128,8 +143,8 @@ export async function POST(req: NextRequest) {
                 style,
                 width,
                 height,
-                aspectRatio,
-                imageSize: baseImageSize,
+                aspectRatio: aspectRatio as "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "2:3" | "3:2" | "4:5" | "21:9",
+                imageSize: baseImageSize as "1K" | "2K",
                 referenceImages,
                 editImage,
                 editInstruction,
@@ -166,9 +181,17 @@ export async function POST(req: NextRequest) {
 
         // 6. Save to History
         const insertStmt = db.prepare(`
-            INSERT INTO generations (user_id, prompt, style, size, image_url, quality)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO generations (user_id, prompt, style, size, image_url, quality, reference_image_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         `);
+
+        // Determine reference/edit image URL to save
+        let savedRefImage = null;
+        if (editImage) {
+            savedRefImage = editImage;
+        } else if (referenceImages && referenceImages.length > 0) {
+            savedRefImage = referenceImages[0];
+        }
 
         insertStmt.run(
             userId,
@@ -176,8 +199,40 @@ export async function POST(req: NextRequest) {
             engine === "kie" ? "Nano Banana Pro" : (engine === "fal" ? "Nano Banana Pro (Fal)" : (style || "None")),
             `${finalWidth}x${finalHeight}`,
             finalImage,
-            quality
+            quality,
+            savedRefImage
         );
+
+        // 7. Save Locally (Silent Fail)
+        try {
+            const SAVE_DIR = '/Users/puneet/Downloads/My gen'; // Hardcoded as requested
+            if (!fs.existsSync(SAVE_DIR)) {
+                fs.mkdirSync(SAVE_DIR, { recursive: true });
+            }
+
+            const timestamp = Date.now();
+            const filenameBase = `img_${timestamp}`;
+            const imagePath = path.join(SAVE_DIR, `${filenameBase}.png`);
+            const textPath = path.join(SAVE_DIR, `${filenameBase}.txt`);
+
+            // Save Text
+            const textContent = `Prompt: ${prompt}\nInstruction: ${editInstruction || ''}\nEngine: ${engine}\nStyle: ${style}\nSeed: ${seed || 'Random'}\nQuality: ${quality}`;
+            fs.writeFileSync(textPath, textContent);
+
+            // Save Image
+            if (finalImage.startsWith('data:')) {
+                const base64Data = finalImage.replace(/^data:image\/\w+;base64,/, "");
+                fs.writeFileSync(imagePath, base64Data, 'base64');
+            } else if (finalImage.startsWith('http')) {
+                const imgRes = await fetch(finalImage);
+                const buffer = await imgRes.arrayBuffer();
+                fs.writeFileSync(imagePath, Buffer.from(buffer));
+            }
+
+        } catch (saveError) {
+            console.error("Local save failed:", saveError);
+            // Don't fail the request, just log
+        }
 
         return NextResponse.json({
             success: true,
@@ -187,10 +242,13 @@ export async function POST(req: NextRequest) {
             credits: credits.amount - 1,
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Generation error:", error);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const msg = (error as any).message || "Something went wrong";
         return NextResponse.json(
-            { error: error.message || "Something went wrong", details: error.toString() },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            { error: msg, details: (error as any).toString() },
             { status: 500 }
         );
     }

@@ -3,22 +3,17 @@ import {
     Home,
     Sparkles,
     Image as ImageIcon,
-    Video,
     Bot,
-    LayoutGrid,
-    History,
-    HelpCircle,
-    Settings,
-    Search,
-    Users
+    History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
     onAssistantClick?: () => void;
+    onShowHistory?: () => void;
 }
 
-export function Sidebar({ onAssistantClick }: SidebarProps) {
+export function Sidebar({ onAssistantClick, onShowHistory }: SidebarProps) {
     return (
         <div className="w-64 h-screen glass-panel border-r-0 flex flex-col flex-shrink-0 z-20 relative">
             {/* Logo */}
@@ -52,7 +47,7 @@ export function Sidebar({ onAssistantClick }: SidebarProps) {
 
             {/* Bottom Nav */}
             <div className="px-2 py-4 space-y-1">
-                <NavItem icon={History} label="History" href="/history" />
+                <NavItem icon={History} label="History" onClick={onShowHistory} />
             </div>
         </div>
     );
@@ -66,7 +61,7 @@ function NavItem({
     href,
     onClick
 }: {
-    icon: any,
+    icon: React.ElementType,
     label: string,
     active?: boolean,
     activeVariant?: boolean,

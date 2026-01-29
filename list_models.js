@@ -1,7 +1,7 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+// const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 async function listModels() {
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    // const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     try {
         // Note: listModels is not directly exposed on the main class in some versions, 
         // but usually available via a model manager or similar. 

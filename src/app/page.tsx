@@ -32,6 +32,7 @@ function HomeContent() {
 
   // Queue System
   const [activeRequests, setActiveRequests] = useState(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [queue, setQueue] = useState<{ id: number; data: any }[]>([]);
 
   useEffect(() => {
@@ -116,6 +117,7 @@ function HomeContent() {
     seed?: number;
   }) => {
     const count = data.batchSize || 1;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const newTasks: { id: number; data: any }[] = [];
     const newGenerations: Generation[] = [];
 
@@ -139,9 +141,30 @@ function HomeContent() {
     setQueue((prev) => [...prev, ...newTasks]);
   };
 
+  const loadHistory = async () => {
+    try {
+      const res = await fetch("/api/history");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.generations) {
+          setGenerations((prev) => {
+            const pending = prev.filter(g => g.status === 'pending');
+            const history = data.generations.map((g: Generation) => ({
+              ...g,
+              size: g.size || "1024x1024"
+            }));
+            return [...pending, ...history];
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load history:", error);
+    }
+  };
+
   return (
     <main className="flex h-screen bg-black text-white font-sans overflow-hidden">
-      <Sidebar onAssistantClick={() => setIsAssistantOpen(true)} />
+      <Sidebar onAssistantClick={() => setIsAssistantOpen(true)} onShowHistory={loadHistory} />
       <ControlPanel
         onGenerate={handleGenerate}
         isGenerating={false} // Never block UI now
@@ -151,7 +174,7 @@ function HomeContent() {
         setEditImage={setEditImage}
         initialPrompt={initialPrompt}
       />
-      <Feed generations={generations} onEdit={handleEdit} isGenerating={activeRequests > 0} />
+      <Feed generations={generations} onEdit={handleEdit} onShowHistory={loadHistory} isGenerating={activeRequests > 0} />
       <AssistantModal isOpen={isAssistantOpen} onClose={() => setIsAssistantOpen(false)} />
     </main>
   );

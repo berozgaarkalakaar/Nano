@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, X, Paperclip, Loader2, Image as ImageIcon } from "lucide-react";
+import { Send, Bot, User, X, Paperclip, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,7 @@ export function AssistantModal({ isOpen, onClose }: AssistantModalProps) {
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        // eslint-disable-next-line 
         setMounted(true);
     }, []);
 

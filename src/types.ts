@@ -7,4 +7,6 @@ export interface Generation {
     size: string;
     quality?: string;
     created_at?: string;
+    created_at?: string;
+    reference_image_url?: string;
 }

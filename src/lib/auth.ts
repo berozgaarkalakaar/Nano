@@ -15,8 +15,10 @@ export async function createUser(email: string, password: string) {
         creditStmt.run(info.lastInsertRowid, 10, new Date().toISOString().split('T')[0]);
 
         return info.lastInsertRowid;
-    } catch (error: any) {
-        if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+    } catch (error: unknown) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const code = (error as any).code;
+        if (code === 'SQLITE_CONSTRAINT_UNIQUE') {
             throw new Error('Email already exists');
         }
         throw error;
@@ -25,6 +27,7 @@ export async function createUser(email: string, password: string) {
 
 export async function verifyUser(email: string, password: string) {
     const stmt = db.prepare('SELECT * FROM users WHERE email = ?');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const user = stmt.get(email) as any;
 
     if (!user) return null;
@@ -52,6 +55,7 @@ export function getUserFromSession(token: string) {
     JOIN sessions s ON u.id = s.user_id
     WHERE s.token = ? AND s.expires_at > ?
   `);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return stmt.get(token, new Date().toISOString()) as any;
 }
 

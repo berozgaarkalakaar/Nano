@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { MoreHorizontal, Download, Maximize2, RefreshCw, History, Users, LayoutTemplate, X, Sparkles, Folder, Video, Edit2, Share2, Wand2 } from "lucide-react";
+import { MoreHorizontal, Download, Maximize2, RefreshCw, History, X, Sparkles, Folder, Video, Edit2, Share2, Wand2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Generation } from "@/types";
 import { ProgressiveImage } from "../ui/ProgressiveImage";
-import { Lightbox } from "../ui/Lightbox";
+import { cn } from "@/lib/utils";
 
 const QUALITY_LABELS: Record<string, string> = {
     "BASE_1K": "Base 1K",
@@ -15,6 +15,7 @@ interface FeedProps {
     generations: Generation[];
     onVary?: (gen: Generation) => void;
     onEdit?: (gen: Generation) => void;
+    onShowHistory?: () => void;
     isGenerating?: boolean;
 }
 
@@ -43,7 +44,7 @@ function SkeletonCard() {
 
 
 
-export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
+export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) {
     // ... existing handlers ...
     const handleDownload = (imageUrl: string, prompt: string) => {
         const link = document.createElement("a");
@@ -54,33 +55,58 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
         document.body.removeChild(link);
     };
 
-    const handleCopyPrompt = (prompt: string) => {
-        navigator.clipboard.writeText(prompt);
-        alert("Prompt copied to clipboard!");
+    const [selectedImage, setSelectedImage] = useState<Generation | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+    const toggleSelection = (id: number) => {
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
     };
 
-    const [selectedImage, setSelectedImage] = useState<Generation | null>(null);
+    const toggleSelectAll = () => {
+        if (selectedIds.size === generations.length) {
+            setSelectedIds(new Set());
+        } else {
+            setSelectedIds(new Set(generations.map(g => g.id)));
+        }
+    };
 
     return (
         <div className="flex-1 h-screen bg-[#090909] flex flex-col overflow-hidden relative">
             {/* Top Bar */}
-            <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-[#0f0f0f]">
+            <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-[#0f0f0f] z-30 relative">
                 <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="sm" className="gap-2 bg-white text-black hover:bg-gray-200 rounded-full px-4">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="gap-2 bg-white text-black hover:bg-gray-200 rounded-full px-4"
+                        onClick={onShowHistory}
+                    >
                         <History className="h-4 w-4" />
                         History
                     </Button>
-                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-white">
-                        <Users className="h-4 w-4" />
-                        Community
-                    </Button>
-                    <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground hover:text-white">
-                        <LayoutTemplate className="h-4 w-4" />
-                        Templates
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className={cn("gap-2 text-muted-foreground hover:text-white", selectedIds.size > 0 && "text-blue-400")}
+                        onClick={toggleSelectAll}
+                    >
+                        <span className={cn("w-4 h-4 rounded-full border border-current flex items-center justify-center transition-colors", selectedIds.size === generations.length && generations.length > 0 && "bg-blue-400 border-blue-400")}>
+                            {selectedIds.size === generations.length && generations.length > 0 && <span className="w-2 h-2 bg-white rounded-full" />}
+                        </span>
+                        {selectedIds.size === generations.length && generations.length > 0 ? "Deselect All" : "Select All"}
                     </Button>
                 </div>
 
                 <div className="flex items-center gap-2">
+                    {selectedIds.size > 0 && (
+                        <span className="text-xs text-muted-foreground mr-2">{selectedIds.size} selected</span>
+                    )}
                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">All</Button>
                     <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
                         <MoreHorizontal className="h-4 w-4" />
@@ -116,10 +142,26 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                             <ProgressiveImage src={gen.image} alt={gen.prompt} />
 
                                             {/* Hover Overlay */}
-                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                            <div className={cn(
+                                                "absolute inset-0 bg-black/20 transition-opacity duration-200",
+                                                selectedIds.has(gen.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                                            )}>
                                                 {/* Top Left: Selection */}
                                                 <div className="absolute top-3 left-3">
-                                                    <div className="w-5 h-5 rounded border border-white/50 bg-black/20 hover:bg-black/40 cursor-pointer" />
+                                                    <div
+                                                        className={cn(
+                                                            "w-5 h-5 rounded border cursor-pointer transition-colors flex items-center justify-center",
+                                                            selectedIds.has(gen.id)
+                                                                ? "bg-blue-500 border-blue-500"
+                                                                : "border-white/50 bg-black/20 hover:bg-black/40 hover:border-white"
+                                                        )}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            toggleSelection(gen.id);
+                                                        }}
+                                                    >
+                                                        {selectedIds.has(gen.id) && <span className="text-white text-[10px] font-bold">✓</span>}
+                                                    </div>
                                                 </div>
 
                                                 {/* Top Right: Actions */}
@@ -252,9 +294,16 @@ export function Feed({ generations, onVary, onEdit, isGenerating }: FeedProps) {
                                 {/* Reference Section (Mock) */}
                                 <div className="space-y-2">
                                     <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">REFERENCE</h3>
-                                    <div className="w-16 h-12 rounded border border-white/10 bg-black/40 flex items-center justify-center">
-                                        <span className="text-[10px] text-gray-600">None</span>
-                                    </div>
+                                    {selectedImage.reference_image_url ? (
+                                        <div className="w-16 h-12 rounded border border-white/10 overflow-hidden">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={selectedImage.reference_image_url} alt="Reference" className="w-full h-full object-cover" />
+                                        </div>
+                                    ) : (
+                                        <div className="w-16 h-12 rounded border border-white/10 bg-black/40 flex items-center justify-center">
+                                            <span className="text-[10px] text-gray-600">None</span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Settings Section */}

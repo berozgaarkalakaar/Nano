@@ -11,6 +11,9 @@ An advanced AI image generator powered by Google's Gemini 3 Pro Image model.
 - **Fixed Objects**: Keep specific elements (Logo, Product, Character) consistent across generations.
 - **History**: View your past generations.
 - **Credit System**: Daily credit limits (mock implementation).
+- **Visual Edit**: Draw annotations (make blue, remove, etc.) and control camera angles (rotation, close-up) visually.
+- **Batch History**: Select multiple images in history to manage them efficiently.
+- **Shortcuts**: Use `Cmd + Enter` (Mac) or `Ctrl + Enter` (Win) to generate instantly.
 - **Safe Mode**: Toggle safety filters.
 
 ## Tech Stack

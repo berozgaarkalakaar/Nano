@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 const https = require('https');
 
 const apiKey = "1253c01d1484bee9e8f2d41845e61e70";
@@ -76,7 +77,7 @@ const req = https.request(createUrl, options, (res) => {
                                     console.log("SUCCESS! Result:", b.data.resultJson);
                                     process.exit(0);
                                 }
-                            } catch (e) { }
+                            } catch { }
                         } else {
                             if (body2.length < 500) console.log(`[${idx}] Error Body:`, body2);
                         }

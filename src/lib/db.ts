@@ -36,6 +36,7 @@ db.exec(`
     image_url TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     is_favorite INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'completed',
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `);
@@ -43,7 +44,21 @@ db.exec(`
 // Migration: Add quality column if not exists
 try {
   db.exec("ALTER TABLE generations ADD COLUMN quality TEXT");
-} catch (error) {
+} catch {
+  // Column likely exists or other error, ignore
+}
+
+// Migration: Add status column if not exists
+try {
+  db.exec("ALTER TABLE generations ADD COLUMN status TEXT DEFAULT 'completed'");
+} catch {
+  // Column likely exists or other error, ignore
+}
+
+// Migration: Add reference_image_url column if not exists
+try {
+  db.exec("ALTER TABLE generations ADD COLUMN reference_image_url TEXT");
+} catch {
   // Column likely exists or other error, ignore
 }
 

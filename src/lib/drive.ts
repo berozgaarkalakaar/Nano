@@ -28,7 +28,7 @@ export async function uploadImageToDrive(base64Image: string, filename: string, 
         const buffer = Buffer.from(base64Data, 'base64');
         const stream = Readable.from(buffer);
 
-        const fileMetadata: any = {
+        const fileMetadata: Record<string, unknown> = {
             name: filename,
             // If folderId is provided, put it in that folder
             parents: folderId ? [folderId] : [],
@@ -39,11 +39,12 @@ export async function uploadImageToDrive(base64Image: string, filename: string, 
             body: stream,
         };
 
-        const response = await drive.files.create({
+        const uploadResponse = await drive.files.create({
             requestBody: fileMetadata,
             media: media,
-            fields: 'id, webViewLink, webContentLink',
-        });
+            fields: "id, webViewLink",
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as unknown as any); // Google Drive typings are complex
 
         // Make the file readable by anyone with the link (optional, depends on use case)
         // For private history, we might NOT want this, but for displaying in the app 
@@ -51,7 +52,7 @@ export async function uploadImageToDrive(base64Image: string, filename: string, 
         // Alternatively, we can just return the ID and serve it via a proxy route.
         // For now, let's keep it private to the service account + shared users.
 
-        return response.data.webViewLink;
+        return uploadResponse.data.webViewLink;
     } catch (error) {
         console.error('Error uploading to Drive:', error);
         throw error;

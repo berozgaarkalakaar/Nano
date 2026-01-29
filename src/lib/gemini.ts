@@ -61,7 +61,7 @@ export async function generateBaseImageWithGemini(params: GenerateBaseImageParam
         fullPrompt = `${params.prompt}\n\nStyle: ${params.style || "None"}`;
         if (params.fixedObjects) {
             const fixed = Object.entries(params.fixedObjects)
-                .filter(([_, v]) => v)
+                .filter(([, v]) => v)
                 .map(([k]) => k)
                 .join(", ");
             if (fixed) fullPrompt += `\nKeep fixed: ${fixed}`;
@@ -121,15 +121,16 @@ export async function generateBaseImageWithGemini(params: GenerateBaseImageParam
 
             const result = await model.generateContent({
                 contents: [{ role: "user", parts }],
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 generationConfig: {
                     imageConfig: {
                         aspectRatio: params.aspectRatio || "1:1",
                         imageSize: params.imageSize || "1K",
                         seed: seed
                     }
-                } as any
-            });
+                }
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any // Workaround for strict typing of Google Types
+            );
 
             const response = await result.response;
 

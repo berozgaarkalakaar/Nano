@@ -77,16 +77,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             imageUrl: result,
-            aspectRatio: aspectRatio,
-            resolution: reqResolution,
+            input: {
+                prompt: body.prompt,
+                aspect_ratio: aspectRatio as "1:1" | "16:9" | "9:16" | "4:3" | "3:4" | "2:3" | "3:2" | "4:5" | "21:9",
+                resolution: resolution,
+            },
             credits: credits.amount - 1,
         });
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("Kie Generation error:", error);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const msg = (error as any).message || "Something went wrong with Kie generation";
         return NextResponse.json(
             {
-                error: error.message || "Something went wrong with Kie generation",
-                details: error.toString(),
+                error: msg,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                details: (error as any).toString(),
             },
             { status: 500 }
         );
