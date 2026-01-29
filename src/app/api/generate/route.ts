@@ -7,6 +7,7 @@ import { generateImageWithKie } from "@/lib/kie";
 import { generateImageWithFal } from "@/lib/fal";
 import fs from "fs";
 import path from "path";
+import os from "os";
 
 export async function POST(req: NextRequest) {
     try {
@@ -205,7 +206,9 @@ export async function POST(req: NextRequest) {
 
         // 7. Save Locally (Silent Fail)
         try {
-            const SAVE_DIR = '/Users/puneet/Downloads/My gen'; // Hardcoded as requested
+            const defaultPath = path.join(os.homedir(), "Downloads", "My gen");
+            const SAVE_DIR = process.env.LOCAL_SAVE_PATH || defaultPath;
+
             if (!fs.existsSync(SAVE_DIR)) {
                 fs.mkdirSync(SAVE_DIR, { recursive: true });
             }

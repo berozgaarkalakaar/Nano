@@ -15,6 +15,7 @@ An advanced AI image generator powered by Google's Gemini 3 Pro Image model.
 - **Batch History**: Select multiple images in history to manage them efficiently.
 - **Shortcuts**: Use `Cmd + Enter` (Mac) or `Ctrl + Enter` (Win) to generate instantly.
 - **Safe Mode**: Toggle safety filters.
+- **Local Auto-Save**: Automatically saves every generation to your `Downloads/My gen` folder (or custom path).
 
 ## Tech Stack
 
