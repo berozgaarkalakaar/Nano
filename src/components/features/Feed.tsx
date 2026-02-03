@@ -47,14 +47,20 @@ function SkeletonCard() {
 
 export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) {
     const router = useRouter();
-    const handleDownload = async (imageUrl: string, prompt: string) => {
+    const handleDownload = async (imageUrl: string, prompt: string, bedName?: string) => {
         try {
             const response = await fetch(imageUrl);
             const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const link = document.createElement("a");
             link.href = url;
-            link.download = `${(prompt || "image").slice(0, 20).replace(/[^a-z0-9]/gi, '_')}.png`;
+
+            // Construct filename: BedName or sanitized prompt slug
+            const safeName = bedName
+                ? bedName.trim().replace(/[^a-z0-9\-_]/gi, '_')
+                : (prompt || "image").slice(0, 20).replace(/[^a-z0-9]/gi, '_');
+
+            link.download = `${safeName}.png`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -64,7 +70,13 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
             // Fallback
             const link = document.createElement("a");
             link.href = imageUrl;
-            link.download = `${(prompt || "image").slice(0, 20)}.png`;
+
+            // Construct filename for fallback too
+            const safeName = bedName
+                ? bedName.trim().replace(/[^a-z0-9\-_]/gi, '_')
+                : (prompt || "image").slice(0, 20).replace(/[^a-z0-9]/gi, '_');
+
+            link.download = `${safeName}.png`;
             link.click();
         }
     };
@@ -95,7 +107,7 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
         const items = generations.filter(g => selectedIds.has(g.id));
         for (const item of items) {
             if (item.image) {
-                await handleDownload(item.image, item.prompt || "image");
+                await handleDownload(item.image, item.prompt || "image", item.bedName);
                 // Small delay to prevent throttling
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
@@ -268,7 +280,7 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
                                                         className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleDownload(gen.image || "", gen.prompt || "image");
+                                                            handleDownload(gen.image || "", gen.prompt || "image", gen.bedName);
                                                         }}
                                                     >
                                                         <Download className="h-4 w-4" />
@@ -316,6 +328,9 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
                                     {/* Footer */}
                                     <div className="flex items-start justify-between px-1">
                                         <p className="text-sm text-gray-400 line-clamp-1 max-w-[60%] font-light tracking-wide" title={gen.prompt}>
+                                            {gen.bedName ? (
+                                                <span className="text-white font-medium mr-2">{gen.bedName}</span>
+                                            ) : null}
                                             {gen.prompt}
                                         </p>
                                         <div className="flex items-center gap-2">

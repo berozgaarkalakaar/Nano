@@ -6,7 +6,9 @@ export interface Generation {
     style: string;
     size: string;
     quality?: string;
-    created_at?: string;
+    bedName?: string;
+    engine?: string;
+    timestamp?: number;
     created_at?: string;
     reference_image_url?: string;
 }

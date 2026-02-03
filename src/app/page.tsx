@@ -79,6 +79,7 @@ function HomeContent() {
                   status: "completed",
                   image: finalImageUrl,
                   size: `${img.naturalWidth || 0}x${img.naturalHeight || 0}`,
+                  bedName: data.metadata?.bedName // Persist bedName
                 }
                 : g
             )

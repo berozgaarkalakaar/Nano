@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import {
-    Upload,
     X,
     Loader2,
     Sparkles,
@@ -19,6 +18,7 @@ import {
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Label } from "../ui/label";
+import { ImageUpload } from "../ui/ImageUpload";
 import { cn } from "@/lib/utils";
 
 interface ControlPanelProps {
@@ -107,6 +107,19 @@ const LIGHTING_OPTIONS = [
     "Dramatic"
 ];
 
+const MAGAZINE_STYLES = [
+    "None",
+    "Architectural Digest",
+    "Elle Decor",
+    "Vogue Living",
+    "Dwell",
+    "Domino",
+    "House Beautiful",
+    "Wallpaper*",
+    "Real Simple",
+    "Better Homes & Gardens"
+];
+
 export function ControlPanel({
     onGenerate,
     isGenerating,
@@ -133,17 +146,16 @@ export function ControlPanel({
     const [lighting, setLighting] = useState(LIGHTING_OPTIONS[0]);
     const [fabricImage, setFabricImage] = useState<string | null>(null);
     const [additionalViews, setAdditionalViews] = useState<string[]>([]);
+    const [customColor, setCustomColor] = useState("");
+    const [isAiColor, setIsAiColor] = useState(false);
+    const [magazineStyle, setMagazineStyle] = useState(MAGAZINE_STYLES[0]);
+    const [bedName, setBedName] = useState("");
 
     const [activeTab, setActiveTab] = useState<"prompt" | "visual" | "camera">("prompt");
     const [annotations, setAnnotations] = useState<{ x: number; y: number; text: string }[]>([]);
     const [camera, setCamera] = useState({ rotate: 0, vertical: 0, closeup: 0 });
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const fabricInputRef = useRef<HTMLInputElement>(null);
-    const additionalViewRef = useRef<HTMLInputElement>(null);
-    const editImageInputRef = useRef<HTMLInputElement>(null);
     const promptInputRef = useRef<HTMLTextAreaElement>(null);
-    const imageContainerRef = useRef<HTMLDivElement>(null);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -154,9 +166,13 @@ export function ControlPanel({
     }, [prompt, mode, activeTab]);
 
     const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (activeTab !== "visual" || !editImage || !imageContainerRef.current) return;
+        if (activeTab !== "visual" || !editImage) return;
 
-        const rect = imageContainerRef.current.getBoundingClientRect();
+        // Need the rect of the container, which ImageUpload manages internally usually.
+        // But since we pass onClick with event, we can get target.
+        // The event target might be the img or the container.
+        const target = e.currentTarget;
+        const rect = target.getBoundingClientRect();
         const x = ((e.clientX - rect.left) / rect.width) * 100;
         const y = ((e.clientY - rect.top) / rect.height) * 100;
 
@@ -171,116 +187,9 @@ export function ControlPanel({
         setAnnotations([]);
     }, [editImage]);
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-    };
-
-    const handleEditImageDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            const file = e.dataTransfer.files[0];
-            if (!file.type.startsWith('image/')) return;
-
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setEditImage(reader.result as string);
-                // Annotations are cleared by the useEffect
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleReferenceImageDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.dataTransfer.files) {
-            const files = Array.from(e.dataTransfer.files);
-            files.forEach(file => {
-                if (!file.type.startsWith('image/')) return;
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setReferenceImages(prev => [...prev, reader.result as string]);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-    };
-
-    const handleFabricImageDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-            const file = e.dataTransfer.files[0];
-            if (!file.type.startsWith('image/')) return;
-
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFabricImage(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleFabricImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFabricImage(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const handleAddViewDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        if (e.dataTransfer.files) {
-            const files = Array.from(e.dataTransfer.files);
-            files.forEach(file => {
-                if (!file.type.startsWith('image/')) return;
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setAdditionalViews(prev => [...prev, reader.result as string]);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-    };
 
 
 
-    const handleAddViewChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const files = Array.from(e.target.files);
-            files.forEach(file => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setAdditionalViews(prev => [...prev, reader.result as string]);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            const files = Array.from(e.target.files);
-            files.forEach(file => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    setReferenceImages(prev => [...prev, reader.result as string]);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-    };
 
     useEffect(() => {
         if (initialPrompt) {
@@ -301,17 +210,6 @@ export function ControlPanel({
         return () => window.removeEventListener("keydown", handleKeyDown);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [prompt, mode, editImage, annotations, camera, aspectRatio, quality, batchSize, referenceImages, fixedSeed, engine]);
-
-    const handleEditImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files?.[0]) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setEditImage(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
 
     const handleSubmit = () => {
         const hasVisualChanges = annotations.length > 0 || camera.rotate !== 0 || camera.vertical !== 0 || camera.closeup > 0;
@@ -391,6 +289,14 @@ export function ControlPanel({
             }
             if (lighting !== "None") {
                 finalPrompt += ` Lighting: ${lighting}.`;
+            }
+            if (customColor && !isAiColor) {
+                finalPrompt += ` Paint/Finish Color: ${customColor}.`;
+            } else if (isAiColor) {
+                finalPrompt += ` Select a bed color that perfectly complements the overall scene, lighting, and style.`;
+            }
+            if (magazineStyle !== "None") {
+                finalPrompt += ` Interior photography style inspired by ${magazineStyle}.`;
             }
 
             onGenerate({
@@ -520,68 +426,33 @@ export function ControlPanel({
 
                         {/* Image Preview (Always visible in Edit Mode, but interactive in Visual) */}
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-muted-foreground">IMAGE</Label>
-                            <div
-                                ref={imageContainerRef}
-                                className={cn(
-                                    "border border-dashed border-white/10 rounded-lg flex flex-col items-center justify-center relative overflow-hidden transition-colors",
-                                    !editImage && "p-8 cursor-pointer hover:bg-white/5",
-                                    editImage && activeTab === "visual" && "cursor-crosshair ring-1 ring-blue-500/50"
-                                )}
-                                onClick={!editImage ? () => editImageInputRef.current?.click() : handleImageClick}
-                                onDragOver={handleDragOver}
-                                onDrop={handleEditImageDrop}
+                            <ImageUpload
+                                label="IMAGE"
+                                value={editImage}
+                                onChange={(val) => {
+                                    setEditImage(val);
+                                    setAnnotations([]);
+                                }}
+                                className={cn("h-48", activeTab === "visual" && editImage && "cursor-crosshair")}
+                                placeholder="Upload or Paste Image to Edit"
+                                onClick={handleImageClick}
                             >
-                                {editImage ? (
-                                    <div className="relative w-full aspect-video bg-black/50">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={editImage} alt="Edit Target" className="w-full h-full object-contain pointer-events-none select-none" />
-
-                                        {/* Remove Button */}
-                                        <Button
-                                            size="icon"
-                                            variant="destructive"
-                                            className="absolute top-2 right-2 h-6 w-6 z-10"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditImage(null);
-                                                setAnnotations([]);
-                                            }}
-                                            aria-label="Remove image"
-                                        >
-                                            <X className="h-3 w-3" />
-                                        </Button>
-
-                                        {/* Annotations Overlay */}
-                                        {annotations.map((a, i) => (
-                                            <div
-                                                key={i}
-                                                className="absolute w-4 h-4 -ml-2 -mt-2 bg-blue-500 rounded-full border border-white shadow-lg flex items-center justify-center text-[8px] font-bold text-white z-0 group"
-                                                style={{ left: `${a.x}%`, top: `${a.y}%` }}
-                                            >
-                                                {i + 1}
-                                                {/* Tooltip */}
-                                                <div className="absolute top-full text-[10px] mt-1 bg-black/80 px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {a.text}
-                                                </div>
-                                            </div>
-                                        ))}
+                                {/* Annotations Overlay */}
+                                {editImage && annotations.map((a, i) => (
+                                    <div
+                                        key={i}
+                                        className="absolute w-4 h-4 -ml-2 -mt-2 bg-blue-500 rounded-full border border-white shadow-lg flex items-center justify-center text-[8px] font-bold text-white z-20 group"
+                                        style={{ left: `${a.x}%`, top: `${a.y}%` }}
+                                        onClick={(e) => e.stopPropagation()} // Prevent adding new point when clicking existing
+                                    >
+                                        {i + 1}
+                                        {/* Tooltip */}
+                                        <div className="absolute top-full text-[10px] mt-1 bg-black/80 px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {a.text}
+                                        </div>
                                     </div>
-                                ) : (
-                                    <>
-                                        <Upload className="h-8 w-8 text-muted-foreground" />
-                                        <span className="text-xs text-muted-foreground">Upload image to edit</span>
-                                    </>
-                                )}
-                                <input
-                                    type="file"
-                                    ref={editImageInputRef}
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleEditImageChange}
-                                    aria-label="Upload image to edit"
-                                />
-                            </div>
+                                ))}
+                            </ImageUpload>
                         </div>
 
                         {/* Tab Content */}
@@ -670,22 +541,13 @@ export function ControlPanel({
 
                         {/* References (Edit Mode) */}
                         <div className="space-y-2 relative">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-xs font-semibold text-muted-foreground">REFERENCES</Label>
-                                <Button variant="ghost" size="sm" className="h-6 text-blue-400 hover:text-blue-300 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
-                                    <Plus className="h-3 w-3" /> Add
-                                </Button>
-                            </div>
+                            <Label className="text-xs font-semibold text-muted-foreground">REFERENCES</Label>
 
-                            <div className="grid grid-cols-3 gap-2"
-                                onDragOver={handleDragOver}
-                                onDrop={handleReferenceImageDrop}
-                            >
+                            <div className="grid grid-cols-3 gap-2">
                                 {referenceImages.map((img, i) => (
                                     <div
                                         key={i}
                                         className="relative rounded-lg overflow-hidden aspect-square group cursor-pointer border-2 border-transparent hover:border-blue-500 transition-all"
-                                        // onClick={() => setPrompt(prev => prev + (prev.length > 0 && !prev.endsWith(" ") ? " " : "") + `@img${i + 1}`)}
                                         title="Reference Image"
                                     >
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -702,12 +564,24 @@ export function ControlPanel({
                                         </button>
                                     </div>
                                 ))}
-                                <div
-                                    className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <Upload className="h-4 w-4 text-muted-foreground" />
-                                </div>
+
+                                <ImageUpload
+                                    onChange={(val) => {
+                                        if (val) setReferenceImages(prev => [...prev, val]);
+                                    }}
+                                    onUpload={(files) => {
+                                        if (files) {
+                                            Array.from(files).forEach(file => {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => setReferenceImages(prev => [...prev, reader.result as string]);
+                                                reader.readAsDataURL(file);
+                                            });
+                                        }
+                                    }}
+                                    multiple
+                                    className="h-full aspect-square"
+                                    placeholder="Add"
+                                />
                             </div>
                         </div>
                     </div>
@@ -775,6 +649,8 @@ export function ControlPanel({
                             </Select>
                         </div>
 
+
+
                         {/* Lighting Selector */}
                         <div className="space-y-2">
                             <Label className="text-xs font-semibold text-muted-foreground">LIGHTING</Label>
@@ -792,66 +668,86 @@ export function ControlPanel({
                             </Select>
                         </div>
 
+                        {/* Custom Color Selector */}
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-semibold text-muted-foreground">PAINT / FINISH COLOR (ALL BEDS)</Label>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsAiColor(!isAiColor)}
+                                    className={cn("h-5 px-2 text-[10px] gap-1", isAiColor ? "text-blue-400 bg-blue-500/10" : "text-muted-foreground hover:text-white")}
+                                >
+                                    <Sparkles className="h-3 w-3" />
+                                    {isAiColor ? "AI Magic On" : "Let AI Pick"}
+                                </Button>
+                            </div>
+
+                            {!isAiColor ? (
+                                <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                        <div
+                                            className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border border-white/20 shadow-sm"
+                                            style={{ backgroundColor: customColor || 'transparent' }}
+                                        />
+                                        <input
+                                            type="text"
+                                            placeholder="#FFFFFF or Name"
+                                            value={customColor}
+                                            onChange={(e) => setCustomColor(e.target.value)}
+                                            className="w-full h-9 pl-8 pr-3 bg-[#1a1a1a] border border-white/10 rounded-md text-xs text-white focus:outline-none focus:border-blue-500/50 placeholder:text-muted-foreground/50"
+                                        />
+                                    </div>
+                                    <input
+                                        type="color"
+                                        value={customColor || "#ffffff"}
+                                        onChange={(e) => setCustomColor(e.target.value)}
+                                        className="h-9 w-9 p-0.5 bg-[#1a1a1a] border border-white/10 rounded-md cursor-pointer"
+                                        title="Pick a color"
+                                    />
+                                </div>
+                            ) : (
+                                <div className="h-9 w-full bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-pink-500/20 border border-white/10 rounded-md flex items-center justify-center text-xs text-white/80 animate-pulse">
+                                    <Sparkles className="h-3 w-3 mr-2 text-yellow-400" />
+                                    AI will select the perfect color harmony
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Magazine Style Selector */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-muted-foreground">MAGAZINE STYLE</Label>
+                            <Select
+                                value={magazineStyle}
+                                onChange={(e) => setMagazineStyle(e.target.value)}
+                                className="w-full premium-input border-white/10 text-white"
+                                aria-label="Select Magazine Style"
+                            >
+                                {MAGAZINE_STYLES.map((style) => (
+                                    <option key={style} value={style} className="bg-[#1a1a1a] text-white">
+                                        {style}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+
                         {/* Object / Target Image (Uses editImage state) */}
                         <div className="space-y-2">
-                            <Label className="text-xs font-semibold text-muted-foreground">OBJECT / TARGET</Label>
-                            <div
-                                className={cn(
-                                    "border border-dashed border-white/10 rounded-lg flex flex-col items-center justify-center relative overflow-hidden transition-colors h-32",
-                                    !editImage && "cursor-pointer hover:bg-white/5",
-                                    editImage && "border-solid border-blue-500/50"
-                                )}
-                                onClick={!editImage ? () => editImageInputRef.current?.click() : undefined}
-                                onDragOver={handleDragOver}
-                                onDrop={handleEditImageDrop}
-                            >
-                                {editImage ? (
-                                    <div className="relative w-full h-full">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={editImage} alt="Target" className="w-full h-full object-contain pointer-events-none select-none" />
-                                        <Button
-                                            size="icon"
-                                            variant="destructive"
-                                            className="absolute top-1 right-1 h-5 w-5"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setEditImage(null);
-                                            }}
-                                        >
-                                            <X className="h-3 w-3" />
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col items-center text-muted-foreground">
-                                        <Upload className="h-5 w-5 mb-1" />
-                                        <span className="text-[10px]">Upload Target Object</span>
-                                    </div>
-                                )}
-                                {/* Reuse input ref for ease, though logically separate could be better */}
-                                <input
-                                    type="file"
-                                    ref={editImageInputRef}
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleEditImageChange}
-                                />
-                            </div>
+                            <ImageUpload
+                                label="OBJECT / TARGET"
+                                value={editImage}
+                                onChange={setEditImage}
+                                className="h-32"
+                                placeholder="Upload Target Object"
+                            />
                         </div>
 
 
 
                         {/* Additional Views (Collapsible/Grid) */}
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-xs font-semibold text-muted-foreground">ADDITIONAL VIEWS</Label>
-                                <Button variant="ghost" size="sm" className="h-6 text-blue-400 hover:text-blue-300 text-xs gap-1" onClick={() => additionalViewRef.current?.click()}>
-                                    <Plus className="h-3 w-3" /> Add
-                                </Button>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2"
-                                onDragOver={handleDragOver}
-                                onDrop={handleAddViewDrop}
-                            >
+                            <Label className="text-xs font-semibold text-muted-foreground">ADDITIONAL VIEWS</Label>
+                            <div className="grid grid-cols-3 gap-2">
                                 {additionalViews.map((img, i) => (
                                     <div key={i} className="relative rounded-lg overflow-hidden aspect-square group border border-white/10">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -865,85 +761,43 @@ export function ControlPanel({
                                         </button>
                                     </div>
                                 ))}
-                                <div
-                                    className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
-                                    onClick={() => additionalViewRef.current?.click()}
-                                >
-                                    <Upload className="h-4 w-4 text-muted-foreground" />
-                                </div>
+                                <ImageUpload
+                                    onChange={(val) => {
+                                        if (val) setAdditionalViews(prev => [...prev, val]);
+                                    }}
+                                    onUpload={(files) => {
+                                        if (files) {
+                                            Array.from(files).forEach(file => {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => setAdditionalViews(prev => [...prev, reader.result as string]);
+                                                reader.readAsDataURL(file);
+                                            });
+                                        }
+                                    }}
+                                    multiple
+                                    className="h-full aspect-square"
+                                    placeholder="Add"
+                                />
                             </div>
-                            <input
-                                type="file"
-                                ref={additionalViewRef}
-                                className="hidden"
-                                multiple
-                                accept="image/*"
-                                onChange={handleAddViewChange}
-                                aria-label="Upload Additional Views"
-                            />
                         </div>
 
                         {/* Fabric Upload (Conditional) */}
                         {selectedBedType.toLowerCase().includes("upholstered") && (
                             <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-muted-foreground">FABRIC (Optional)</Label>
-                                <div
-                                    className={cn(
-                                        "border border-dashed border-white/10 rounded-lg flex flex-col items-center justify-center relative overflow-hidden transition-colors h-24",
-                                        !fabricImage && "cursor-pointer hover:bg-white/5",
-                                        fabricImage && "border-solid border-purple-500/50"
-                                    )}
-                                    onClick={!fabricImage ? () => fabricInputRef.current?.click() : undefined}
-                                    onDragOver={handleDragOver}
-                                    onDrop={handleFabricImageDrop}
-                                >
-                                    {fabricImage ? (
-                                        <div className="relative w-full h-full">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={fabricImage} alt="Fabric" className="w-full h-full object-cover pointer-events-none select-none" />
-                                            <Button
-                                                size="icon"
-                                                variant="destructive"
-                                                className="absolute top-1 right-1 h-5 w-5"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setFabricImage(null);
-                                                }}
-                                                aria-label="Remove Fabric"
-                                            >
-                                                <X className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center text-muted-foreground">
-                                            <Upload className="h-4 w-4 mb-1" />
-                                            <span className="text-[10px]">Upload Fabric</span>
-                                        </div>
-                                    )}
-                                    <input
-                                        type="file"
-                                        ref={fabricInputRef}
-                                        className="hidden"
-                                        accept="image/*"
-                                        onChange={handleFabricImageChange}
-                                        aria-label="Upload Fabric"
-                                    />
-                                </div>
+                                <ImageUpload
+                                    label="FABRIC (Optional)"
+                                    value={fabricImage}
+                                    onChange={setFabricImage}
+                                    className="h-24"
+                                    placeholder="Upload Fabric"
+                                />
                             </div>
                         )}
 
                         {/* Style References (Uses referenceImages state) */}
                         <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-xs font-semibold text-muted-foreground">STYLE REFERENCES</Label>
-                                <Button variant="ghost" size="sm" className="h-6 text-blue-400 hover:text-blue-300 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
-                                    <Plus className="h-3 w-3" /> Add
-                                </Button>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2"
-                                onDragOver={handleDragOver}
-                                onDrop={handleReferenceImageDrop}
-                            >
+                            <Label className="text-xs font-semibold text-muted-foreground">STYLE REFERENCES</Label>
+                            <div className="grid grid-cols-3 gap-2">
                                 {referenceImages.map((img, i) => (
                                     <div key={i} className="relative rounded-lg overflow-hidden aspect-square group border border-white/10">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -957,12 +811,23 @@ export function ControlPanel({
                                         </button>
                                     </div>
                                 ))}
-                                <div
-                                    className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <Upload className="h-4 w-4 text-muted-foreground" />
-                                </div>
+                                <ImageUpload
+                                    onChange={(val) => {
+                                        if (val) setReferenceImages(prev => [...prev, val]);
+                                    }}
+                                    onUpload={(files) => {
+                                        if (files) {
+                                            Array.from(files).forEach(file => {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => setReferenceImages(prev => [...prev, reader.result as string]);
+                                                reader.readAsDataURL(file);
+                                            });
+                                        }
+                                    }}
+                                    multiple
+                                    className="h-full aspect-square"
+                                    placeholder="Add"
+                                />
                             </div>
                         </div>
 
@@ -981,24 +846,26 @@ export function ControlPanel({
                     <>
                         {/* References */}
                         <div className="space-y-2 relative">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-xs font-semibold text-muted-foreground">REFERENCES</Label>
-                                <Button variant="ghost" size="sm" className="h-6 text-blue-400 hover:text-blue-300 text-xs gap-1" onClick={() => fileInputRef.current?.click()}>
-                                    <Plus className="h-3 w-3" /> Add
-                                </Button>
-                            </div>
+                            <Label className="text-xs font-semibold text-muted-foreground">REFERENCES</Label>
 
-                            <div className="grid grid-cols-3 gap-2"
-                                onDragOver={handleDragOver}
-                                onDrop={handleReferenceImageDrop}
-                            >
-                                <div
-                                    className="border border-dashed border-white/10 rounded-lg p-3 flex flex-col items-center justify-center gap-1 cursor-pointer hover:bg-white/5 transition-colors aspect-square"
-                                    onClick={() => fileInputRef.current?.click()}
-                                >
-                                    <Upload className="h-4 w-4 text-muted-foreground" />
-                                    <span className="text-[10px] text-muted-foreground">Upload</span>
-                                </div>
+                            <div className="grid grid-cols-3 gap-2">
+                                <ImageUpload
+                                    onChange={(val) => {
+                                        if (val) setReferenceImages(prev => [...prev, val]);
+                                    }}
+                                    onUpload={(files) => {
+                                        if (files) {
+                                            Array.from(files).forEach(file => {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => setReferenceImages(prev => [...prev, reader.result as string]);
+                                                reader.readAsDataURL(file);
+                                            });
+                                        }
+                                    }}
+                                    multiple
+                                    className="h-full aspect-square"
+                                    placeholder="Add"
+                                />
 
                                 {referenceImages.map((img, i) => (
                                     <div
@@ -1039,7 +906,8 @@ export function ControlPanel({
                             />
                         </div>
                     </>
-                )}
+                )
+                }
 
                 {/* Controls Row */}
                 <div className="space-y-4">
@@ -1138,17 +1006,8 @@ export function ControlPanel({
                     )}
                 </Button>
 
-                {/* Hidden File Input for References - Always Rendered */}
-                <input
-                    type="file"
-                    ref={fileInputRef}
-                    className="hidden"
-                    multiple
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    aria-label="Upload reference images"
-                />
-            </div>
+
+            </div >
         </div >
     );
 }

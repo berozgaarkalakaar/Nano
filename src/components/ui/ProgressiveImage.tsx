@@ -19,8 +19,8 @@ export function ProgressiveImage({ src, alt, className }: ProgressiveImageProps)
                 src={src}
                 alt={alt}
                 className={cn(
-                    "w-full h-full transition-all duration-[2000ms] ease-out",
-                    isLoading ? "scale-110 blur-xl grayscale opacity-0" : "scale-100 blur-0 grayscale-0 opacity-100",
+                    "w-full h-full transition-all duration-500 ease-out",
+                    isLoading ? "scale-105 blur-lg grayscale opacity-0" : "scale-100 blur-0 grayscale-0 opacity-100",
                     "object-cover" // Default, can be overridden by className via cn if properly ordered, but specific class logic might be needed
                 )}
                 // Note: If className passes 'object-contain', it might conflict with 'object-cover' here if cn merges simply.

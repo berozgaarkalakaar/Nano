@@ -17,7 +17,7 @@ interface LightboxProps {
     onEdit?: (gen: Generation) => void;
     onRecreate?: (gen: Generation) => void;
     onDelete?: (gen: Generation) => void;
-    onDownload?: (imageUrl: string, prompt: string) => void;
+    onDownload?: (imageUrl: string, prompt: string, bedName?: string) => void;
     onCopyPrompt?: (prompt: string) => void;
 }
 
@@ -51,7 +51,7 @@ export function Lightbox({ image, onClose, onEdit, onRecreate, onDelete, onDownl
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">
                                 <Share2 className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => onDownload?.(image.image || "", image.prompt || "")}>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => onDownload?.(image.image || "", image.prompt || "", image.bedName)}>
                                 <Download className="h-4 w-4" />
                             </Button>
                             {/* Delete Button */}
