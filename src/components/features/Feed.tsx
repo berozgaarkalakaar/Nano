@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { MoreHorizontal, Download, Maximize2, RefreshCw, History, X, Sparkles, Folder, Video, Edit2, Share2, Wand2 } from "lucide-react";
+import { MoreHorizontal, Download, RefreshCw, History, Folder, Video, Edit2, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Generation } from "@/types";
 import { ProgressiveImage } from "../ui/ProgressiveImage";
 import { cn } from "@/lib/utils";
+import { Lightbox } from "../ui/Lightbox";
+import { useRouter } from "next/navigation";
+import { Sparkles } from "lucide-react";
 
 const QUALITY_LABELS: Record<string, string> = {
     "BASE_1K": "Base 1K",
@@ -42,21 +45,33 @@ function SkeletonCard() {
     );
 }
 
-
-
 export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) {
-    // ... existing handlers ...
-    const handleDownload = (imageUrl: string, prompt: string) => {
-        const link = document.createElement("a");
-        link.href = imageUrl;
-        link.download = `${prompt.slice(0, 20)}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const router = useRouter();
+    const handleDownload = async (imageUrl: string, prompt: string) => {
+        try {
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${(prompt || "image").slice(0, 20).replace(/[^a-z0-9]/gi, '_')}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (error) {
+            console.error("Download failed:", error);
+            // Fallback
+            const link = document.createElement("a");
+            link.href = imageUrl;
+            link.download = `${(prompt || "image").slice(0, 20)}.png`;
+            link.click();
+        }
     };
 
     const [selectedImage, setSelectedImage] = useState<Generation | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const toggleSelection = (id: number) => {
         const newSelected = new Set(selectedIds);
@@ -74,6 +89,69 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
         } else {
             setSelectedIds(new Set(generations.map(g => g.id)));
         }
+    };
+
+    const handleBulkDownload = async () => {
+        const items = generations.filter(g => selectedIds.has(g.id));
+        for (const item of items) {
+            if (item.image) {
+                await handleDownload(item.image, item.prompt || "image");
+                // Small delay to prevent throttling
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+        }
+        setSelectedIds(new Set());
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Are you sure you want to delete ${selectedIds.size} items?`)) return;
+
+        setIsDeleting(true);
+        try {
+            const response = await fetch("/api/history/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: Array.from(selectedIds) }),
+            });
+
+            if (response.ok) {
+                onShowHistory?.();
+                setSelectedIds(new Set());
+            } else {
+                alert("Failed to delete items.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error deleting items.");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const handleRecreate = (gen: Generation) => {
+        const params = new URLSearchParams();
+        if (gen.prompt) params.set("prompt", gen.prompt);
+        router.push(`/?${params.toString()}`);
+        setSelectedImage(null);
+    };
+
+    const handleSingleDelete = async (gen: Generation) => {
+        if (!window.confirm("Delete this image?")) return;
+        try {
+            await fetch("/api/history/delete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ids: [gen.id] }),
+            });
+            onShowHistory?.();
+            setSelectedImage(null);
+        } catch (e) {
+            console.error(e);
+        }
+    };
+
+    const handleCopyPrompt = (prompt: string) => {
+        navigator.clipboard.writeText(prompt);
     };
 
     return (
@@ -105,12 +183,24 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
 
                 <div className="flex items-center gap-2">
                     {selectedIds.size > 0 && (
-                        <span className="text-xs text-muted-foreground mr-2">{selectedIds.size} selected</span>
+                        <>
+                            <span className="text-xs text-muted-foreground mr-2">{selectedIds.size} selected</span>
+                            <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={isDeleting}>
+                                <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </Button>
+                            <Button variant="default" size="sm" onClick={handleBulkDownload}>
+                                <Download className="h-4 w-4 mr-2" /> Download
+                            </Button>
+                        </>
                     )}
-                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">All</Button>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
-                        <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    {!selectedIds.size && (
+                        <>
+                            <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-white">All</Button>
+                            <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-white">
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -178,7 +268,7 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
                                                         className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
-                                                            handleDownload(gen.image || "", gen.prompt);
+                                                            handleDownload(gen.image || "", gen.prompt || "image");
                                                         }}
                                                     >
                                                         <Download className="h-4 w-4" />
@@ -223,7 +313,7 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
                                         </div>
                                     </div>
 
-                                    {/* Header (now Footer) */}
+                                    {/* Footer */}
                                     <div className="flex items-start justify-between px-1">
                                         <p className="text-sm text-gray-400 line-clamp-1 max-w-[60%] font-light tracking-wide" title={gen.prompt}>
                                             {gen.prompt}
@@ -244,127 +334,16 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
                 )}
             </div>
 
-            {/* Lightbox Modal */}
             {selectedImage && (
-                <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200" onClick={() => setSelectedImage(null)}>
-                    <div className="w-full h-full flex overflow-hidden" onClick={(e) => e.stopPropagation()}>
-
-                        {/* Left: Image Area */}
-                        <div className="flex-1 relative flex items-center justify-center bg-[#090909] p-8">
-                            <ProgressiveImage
-                                src={selectedImage.image || ""}
-                                alt={selectedImage.prompt}
-                                className="max-w-full max-h-full object-contain shadow-2xl"
-                            />
-                            <Button
-                                size="icon"
-                                variant="ghost"
-                                className="absolute top-4 left-4 text-white hover:bg-white/10 rounded-full"
-                                onClick={() => setSelectedImage(null)}
-                            >
-                                <X className="h-6 w-6" />
-                            </Button>
-                        </div>
-
-                        {/* Right: Details Panel */}
-                        <div className="w-[400px] bg-[#1a1a1a] border-l border-white/5 flex flex-col h-full overflow-y-auto">
-                            <div className="p-6 space-y-8">
-                                {/* Header Actions */}
-                                <div className="flex items-center justify-end gap-2">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">
-                                        <Share2 className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => handleDownload(selectedImage.image || "", selectedImage.prompt)}>
-                                        <Download className="h-4 w-4" />
-                                    </Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                </div>
-
-                                {/* Prompt Section */}
-                                <div className="space-y-2">
-                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">PROMPT</h3>
-                                    <p className="text-sm text-gray-200 leading-relaxed">
-                                        {selectedImage.prompt}
-                                    </p>
-                                    <button className="text-xs text-blue-400 hover:text-blue-300 font-medium">See more</button>
-                                </div>
-
-                                {/* Reference Section (Mock) */}
-                                <div className="space-y-2">
-                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">REFERENCE</h3>
-                                    {selectedImage.reference_image_url ? (
-                                        <div className="w-16 h-12 rounded border border-white/10 overflow-hidden">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={selectedImage.reference_image_url} alt="Reference" className="w-full h-full object-cover" />
-                                        </div>
-                                    ) : (
-                                        <div className="w-16 h-12 rounded border border-white/10 bg-black/40 flex items-center justify-center">
-                                            <span className="text-[10px] text-gray-600">None</span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Settings Section */}
-                                <div className="space-y-2">
-                                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">SETTINGS</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300 border border-white/5">
-                                            {selectedImage.size.replace('x', ':')}
-                                        </span>
-                                        {selectedImage.quality && (
-                                            <span className="px-2 py-1 rounded bg-purple-500/10 text-xs text-purple-300 border border-purple-500/20">
-                                                {QUALITY_LABELS[selectedImage.quality] || selectedImage.quality}
-                                            </span>
-                                        )}
-                                        <span className="px-2 py-1 rounded bg-white/5 text-xs text-gray-300 border border-white/5">
-                                            Google Nano Banana Pro
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Actions List */}
-                                <div className="space-y-1 pt-4">
-                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
-                                        <RefreshCw className="h-4 w-4" />
-                                        Recreate
-                                    </Button>
-                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
-                                        <Maximize2 className="h-4 w-4" />
-                                        Upscale
-                                    </Button>
-                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
-                                        <Video className="h-4 w-4" />
-                                        Create video
-                                    </Button>
-                                    <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
-                                        <Wand2 className="h-4 w-4" />
-                                        Variations
-                                    </Button>
-                                </div>
-                            </div>
-
-                            {/* Footer Action */}
-                            <div className="mt-auto p-6 border-t border-white/5 bg-[#1a1a1a]">
-                                <Button
-                                    className="w-full bg-white text-black hover:bg-gray-200 font-semibold h-10"
-                                    onClick={() => {
-                                        onEdit?.(selectedImage);
-                                        setSelectedImage(null);
-                                    }}
-                                >
-                                    <Edit2 className="h-4 w-4 mr-2" />
-                                    Edit Image
-                                </Button>
-                                <div className="flex items-center justify-between mt-4 text-xs text-gray-500">
-                                    <span>100%</span>
-                                    <span>{selectedImage.size.replace('x', '×')} px</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <Lightbox
+                    image={selectedImage}
+                    onClose={() => setSelectedImage(null)}
+                    onEdit={onEdit}
+                    onRecreate={handleRecreate}
+                    onDelete={handleSingleDelete}
+                    onDownload={handleDownload}
+                    onCopyPrompt={handleCopyPrompt}
+                />
             )}
         </div>
     );

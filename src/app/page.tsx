@@ -10,7 +10,7 @@ import { AssistantModal } from "@/components/features/AssistantModal";
 
 function HomeContent() {
   const [generations, setGenerations] = useState<Generation[]>([]);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [mode, setMode] = useState<"default" | "edit" | "custom">("default");
   const [editImage, setEditImage] = useState<string | null>(null);
   const [initialPrompt, setInitialPrompt] = useState("");
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -23,8 +23,13 @@ function HomeContent() {
 
     if (editImgObj) {
       setEditImage(editImgObj);
-      setIsEditMode(true);
+      setMode("edit");
+    } else {
+      // Reset edit mode if no editImage param is present (e.g. Recreate flow)
+      setEditImage(null);
+      setMode("default");
     }
+
     if (promptObj) {
       setInitialPrompt(promptObj);
     }
@@ -96,7 +101,7 @@ function HomeContent() {
   const handleEdit = (gen: Generation) => {
     if (gen.image) {
       setEditImage(gen.image);
-      setIsEditMode(true);
+      setMode("edit");
     }
   };
 
@@ -110,7 +115,7 @@ function HomeContent() {
     editImage?: string;
     editInstruction?: string;
     batchSize?: number;
-    engine?: "gemini" | "kie" | "fal";
+    engine?: "gemini" | "kie" | "fal" | "vertex";
     aspectRatio?: string;
     quality?: string;
     fixedSeed?: boolean;
@@ -168,8 +173,8 @@ function HomeContent() {
       <ControlPanel
         onGenerate={handleGenerate}
         isGenerating={false} // Never block UI now
-        isEditMode={isEditMode}
-        setIsEditMode={setIsEditMode}
+        mode={mode}
+        setMode={setMode}
         editImage={editImage}
         setEditImage={setEditImage}
         initialPrompt={initialPrompt}

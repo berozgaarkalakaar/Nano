@@ -62,6 +62,13 @@ try {
   // Column likely exists or other error, ignore
 }
 
+// Migration: Add local_path column if not exists
+try {
+  db.exec("ALTER TABLE generations ADD COLUMN local_path TEXT");
+} catch {
+  // Column likely exists or other error, ignore
+}
+
 // Seed default user if not exists
 const userCheck = db.prepare("SELECT id FROM users WHERE id = 1").get();
 if (!userCheck) {

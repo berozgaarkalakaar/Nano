@@ -15,11 +15,13 @@ interface LightboxProps {
     image: Generation;
     onClose: () => void;
     onEdit?: (gen: Generation) => void;
+    onRecreate?: (gen: Generation) => void;
+    onDelete?: (gen: Generation) => void;
     onDownload?: (imageUrl: string, prompt: string) => void;
     onCopyPrompt?: (prompt: string) => void;
 }
 
-export function Lightbox({ image, onClose, onEdit, onDownload, onCopyPrompt }: LightboxProps) {
+export function Lightbox({ image, onClose, onEdit, onRecreate, onDelete, onDownload, onCopyPrompt }: LightboxProps) {
     return (
         <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-200" onClick={onClose}>
             <div className="w-full h-full flex overflow-hidden" onClick={(e) => e.stopPropagation()}>
@@ -52,8 +54,9 @@ export function Lightbox({ image, onClose, onEdit, onDownload, onCopyPrompt }: L
                             <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white" onClick={() => onDownload?.(image.image || "", image.prompt || "")}>
                                 <Download className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-gray-400 hover:text-white">
-                                <MoreHorizontal className="h-4 w-4" />
+                            {/* Delete Button */}
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={() => onDelete?.(image)}>
+                                <MoreHorizontal className="h-4 w-4 rotate-90" /> {/* Placeholder icon or use Trash */}
                             </Button>
                         </div>
 
@@ -89,9 +92,16 @@ export function Lightbox({ image, onClose, onEdit, onDownload, onCopyPrompt }: L
 
                         {/* Actions List */}
                         <div className="space-y-1 pt-4">
-                            <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
+                            <Button
+                                variant="ghost"
+                                className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12"
+                                onClick={() => {
+                                    onRecreate?.(image);
+                                    onClose();
+                                }}
+                            >
                                 <RefreshCw className="h-4 w-4" />
-                                Recreate
+                                Recreate (Use Prompt)
                             </Button>
                             <Button variant="ghost" className="w-full justify-start gap-3 text-gray-300 hover:text-white hover:bg-white/5 h-12">
                                 <Maximize2 className="h-4 w-4" />

@@ -5,6 +5,7 @@ import { generateBaseImageWithGemini } from "@/lib/gemini";
 import { upscaleImage } from "@/lib/upscaler";
 import { generateImageWithKie } from "@/lib/kie";
 import { generateImageWithFal } from "@/lib/fal";
+import { generateImageWithVertex } from "@/lib/vertex";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -129,6 +130,24 @@ export async function POST(req: NextRequest) {
                 console.error("Fal Generation Failed:", falError);
                 throw falError;
             }
+        } else if (engine === "vertex") {
+            try {
+                console.log("Using Google Vertex engine...");
+
+                const result = await generateImageWithVertex({
+                    prompt: editInstruction ? `${prompt} . ${editInstruction}` : prompt,
+                    style: style,
+                    seed: seed
+                });
+
+                finalImage = result.image;
+                finalWidth = result.width;
+                finalHeight = result.height;
+
+            } catch (vertexError: unknown) {
+                console.error("Vertex Generation Failed:", vertexError);
+                throw vertexError;
+            }
         }
 
         // Gemini Logic (Default or Fallback)
@@ -182,8 +201,8 @@ export async function POST(req: NextRequest) {
 
         // 6. Save to History
         const insertStmt = db.prepare(`
-            INSERT INTO generations (user_id, prompt, style, size, image_url, quality, reference_image_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO generations (user_id, prompt, style, size, image_url, quality, reference_image_url, local_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         // Determine reference/edit image URL to save
@@ -194,17 +213,15 @@ export async function POST(req: NextRequest) {
             savedRefImage = referenceImages[0];
         }
 
-        insertStmt.run(
-            userId,
-            prompt || editInstruction || "Image",
-            engine === "kie" ? "Nano Banana Pro" : (engine === "fal" ? "Nano Banana Pro (Fal)" : (style || "None")),
-            `${finalWidth}x${finalHeight}`,
-            finalImage,
-            quality,
-            savedRefImage
-        );
+        console.log("Saving Generation to DB:", {
+            prompt,
+            editInstruction,
+            finalImageLen: finalImage.length,
+            savedRefImageLen: savedRefImage ? savedRefImage.length : 0
+        });
 
         // 7. Save Locally (Silent Fail)
+        let actualLocalPath: string | null = null;
         try {
             const defaultPath = path.join(os.homedir(), "Downloads", "My gen");
             const SAVE_DIR = process.env.LOCAL_SAVE_PATH || defaultPath;
@@ -232,10 +249,23 @@ export async function POST(req: NextRequest) {
                 fs.writeFileSync(imagePath, Buffer.from(buffer));
             }
 
+            actualLocalPath = imagePath;
+
         } catch (saveError) {
             console.error("Local save failed:", saveError);
             // Don't fail the request, just log
         }
+
+        insertStmt.run(
+            userId,
+            prompt || editInstruction || "Image",
+            engine === "kie" ? "Nano Banana Pro" : (engine === "fal" ? "Nano Banana Pro (Fal)" : (style || "None")),
+            `${finalWidth}x${finalHeight}`,
+            finalImage,
+            quality,
+            savedRefImage,
+            actualLocalPath
+        );
 
         return NextResponse.json({
             success: true,
