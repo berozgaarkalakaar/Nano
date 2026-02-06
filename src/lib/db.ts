@@ -69,6 +69,20 @@ try {
   // Column likely exists or other error, ignore
 }
 
+// Migration: Add taskId column if not exists
+try {
+  db.exec("ALTER TABLE generations ADD COLUMN taskId TEXT");
+} catch {
+  // Column likely exists or other error, ignore
+}
+
+// Migration: Add engine column if not exists
+try {
+  db.exec("ALTER TABLE generations ADD COLUMN engine TEXT");
+} catch {
+  // Column likely exists or other error, ignore
+}
+
 // Seed default user if not exists
 const userCheck = db.prepare("SELECT id FROM users WHERE id = 1").get();
 if (!userCheck) {

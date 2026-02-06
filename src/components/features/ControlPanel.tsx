@@ -34,14 +34,14 @@ interface ControlPanelProps {
         aspectRatio?: string;
         quality?: string;
         fixedSeed?: boolean;
-        engine?: "gemini" | "kie" | "fal" | "vertex";
+        engine?: "gemini" | "kie" | "fal" | "vertex" | "midjourney";
     }) => Promise<void>;
     isGenerating: boolean;
     mode: "default" | "edit" | "custom";
     setMode: (value: "default" | "edit" | "custom") => void;
     editImage: string | null;
     setEditImage: (value: string | null) => void;
-    engine?: "gemini" | "kie" | "fal" | "vertex";
+    engine?: "gemini" | "kie" | "fal" | "vertex" | "midjourney";
     initialPrompt?: string;
 }
 
@@ -137,7 +137,55 @@ export function ControlPanel({
     const [referenceImages, setReferenceImages] = useState<string[]>([]);
 
     const [fixedSeed, setFixedSeed] = useState(false);
-    const [engine, setEngine] = useState<"gemini" | "kie" | "fal" | "vertex">("kie");
+    const [engine, setEngine] = useState<"gemini" | "kie" | "fal" | "vertex" | "midjourney">("kie");
+    const [credits, setCredits] = useState<number | null>(null);
+
+    // Funny Loading Messages
+    const [loadingMessage, setLoadingMessage] = useState("");
+    const funnyMessages = [
+        "Hold my coffee, I'm imaging...",
+        "Convincing the pixels to cooperate...",
+        "Reticulating splines...",
+        "Consulting the oracle of creativity...",
+        "Waking up the hamsters...",
+        "Teaching the AI to paint...",
+        "Summoning the art spirits...",
+        "Googling 'how to draw'...",
+        "Adding extra sparkle...",
+        "Generating masterpiece (hopefully)...",
+        "Feeding the GPU...",
+        "Thinking really hard...",
+        "Do not turn off console...",
+        "Making it pop...",
+        "Applying magic dust..."
+    ];
+
+    useEffect(() => {
+        if (isGenerating) {
+            const randomMsg = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+            setLoadingMessage(randomMsg);
+        }
+    }, [isGenerating]);
+
+    // Fetch credits on mount and when generating stops (implies content created)
+    useEffect(() => {
+        const fetchCredits = async () => {
+            try {
+                const res = await fetch("/api/user/credits");
+                const data = await res.json();
+                if (data.credits !== undefined) setCredits(data.credits);
+            } catch (e) {
+                console.error("Failed to fetch credits", e);
+            }
+        };
+
+        fetchCredits();
+
+        // Poll briefly if generating just finished to update balance
+        if (!isGenerating) {
+            fetchCredits();
+        }
+    }, [isGenerating]);
 
     // Custom Mode State
     const [selectedBedType, setSelectedBedType] = useState(BED_TYPES[0]);
@@ -149,7 +197,13 @@ export function ControlPanel({
     const [customColor, setCustomColor] = useState("");
     const [isAiColor, setIsAiColor] = useState(false);
     const [magazineStyle, setMagazineStyle] = useState(MAGAZINE_STYLES[0]);
-    const [bedName, setBedName] = useState("");
+
+    // Midjourney Specific State
+    const [mjStylize, setMjStylize] = useState(100);
+    const [mjWeirdness, setMjWeirdness] = useState(0);
+    const [mjVariety, setMjVariety] = useState(0);
+    const [mjVersion, setMjVersion] = useState("v6.0");
+    const [mjSpeed, setMjSpeed] = useState("fast");
 
     const [activeTab, setActiveTab] = useState<"prompt" | "visual" | "camera">("prompt");
     const [annotations, setAnnotations] = useState<{ x: number; y: number; text: string }[]>([]);
@@ -265,6 +319,8 @@ export function ControlPanel({
                 editImage: editImage,
                 editInstruction: augmentedPrompt.trim(),
                 batchSize: 1,
+                aspectRatio: aspectRatio,
+                quality: quality,
                 fixedSeed: fixedSeed,
                 engine: engine
             });
@@ -380,20 +436,51 @@ export function ControlPanel({
             </div>
 
             <div className="p-4 space-y-6">
-                {/* Model Selector */}
                 <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-muted-foreground">ENGINE</Label>
+                    <Label className="text-xs font-semibold text-muted-foreground mr-2">ENGINE</Label>
+
+                    {/* Credits Display */}
+                    <div className="flex items-center justify-between bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-lg p-2 mb-2 border border-white/5">
+                        <div className="flex items-center gap-2">
+                            <div className="bg-yellow-500/10 p-1.5 rounded-full">
+                                <Sparkles className="h-3 w-3 text-yellow-500" />
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Balance</span>
+                                <span className="text-sm font-bold text-white">{credits !== null ? credits : "..."} <span className="text-[10px] font-normal text-muted-foreground">credits</span></span>
+                            </div>
+                        </div>
+                        <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
+                        <div className="flex flex-col items-end">
+                            <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Cost</span>
+                            <span className="text-sm font-bold text-blue-400">
+                                {engine === "midjourney" && mjSpeed === "turbo" ? "2" : "1"}
+                                <span className="text-[10px] font-normal text-muted-foreground ml-1">/ img</span>
+                            </span>
+                        </div>
+                    </div>
+
                     <Select
                         value={engine}
-                        onChange={(e) => setEngine(e.target.value as "gemini" | "kie" | "fal" | "vertex")}
+                        onChange={(e) => setEngine(e.target.value as "gemini" | "kie" | "fal" | "vertex" | "midjourney")}
                         className="w-full premium-input border-white/10 text-white"
                     >
-                        <option value="gemini" className="bg-[#1a1a1a] text-white">Gemini (Google)</option>
-                        <option value="kie" className="bg-[#1a1a1a] text-white">Nano Banana Pro (Kie.ai)</option>
+                        <option value="gemini" className="bg-[#1a1a1a] text-white">Gemini (Google) - Good for Speed</option>
+                        <option value="kie" className="bg-[#1a1a1a] text-white">Nano Banana Pro (Kie.ai) - High Quality</option>
                         <option value="fal" className="bg-[#1a1a1a] text-white">Nano Banana Pro (Fal.ai)</option>
-                        <option value="vertex" className="bg-[#1a1a1a] text-white">Google Vertex</option>
+                        <option value="vertex" className="bg-[#1a1a1a] text-white">Google Vertex - Photorealistic</option>
+                        <option value="midjourney" className="bg-[#1a1a1a] text-white">Midjourney v6.0 (Kie) - Best Artistic</option>
                     </Select>
                 </div>
+
+                {engine === "midjourney" && (
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-md mb-4">
+                        <p className="text-xs text-blue-300">
+                            <Sparkles className="h-3 w-3 inline mr-1" />
+                            Midjourney selected. Some options like Quality and Seed are managed automatically.
+                        </p>
+                    </div>
+                )}
 
 
 
@@ -926,20 +1013,94 @@ export function ControlPanel({
                         </Select>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-muted-foreground">QUALITY</Label>
-                        <Select
-                            value={quality}
-                            onChange={(e) => setQuality(e.target.value)}
-                            className="w-full premium-input border-white/10 text-white"
-                        >
-                            {QUALITIES.map((q) => (
-                                <option key={q.value} value={q.value} className="bg-[#1a1a1a] text-white">
-                                    {q.label}
-                                </option>
-                            ))}
-                        </Select>
-                    </div>
+
+
+
+                    {engine === "midjourney" && (
+                        <div className="space-y-4 pt-2 border-t border-white/5">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-muted-foreground flex justify-between">
+                                    STYLIZATION <span>{mjStylize}</span>
+                                </Label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1000"
+                                    value={mjStylize}
+                                    onChange={(e) => setMjStylize(Number(e.target.value))}
+                                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                    aria-label="Stylization"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-muted-foreground flex justify-between">
+                                    WEIRDNESS <span>{mjWeirdness}</span>
+                                </Label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="3000"
+                                    value={mjWeirdness}
+                                    onChange={(e) => setMjWeirdness(Number(e.target.value))}
+                                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                    aria-label="Weirdness"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-muted-foreground flex justify-between">
+                                    VARIETY <span>{mjVariety}</span>
+                                </Label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={mjVariety}
+                                    onChange={(e) => setMjVariety(Number(e.target.value))}
+                                    className="w-full h-1 bg-white/20 rounded-lg appearance-none cursor-pointer"
+                                    aria-label="Variety"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-semibold text-muted-foreground">VERSION</Label>
+                                    <Select value={mjVersion} onChange={(e) => setMjVersion(e.target.value)} className="w-full premium-input border-white/10 text-white text-xs h-9">
+                                        <option value="v7" className="bg-[#1a1a1a]">Version 7</option>
+                                        <option value="v6.1" className="bg-[#1a1a1a]">Version 6.1</option>
+                                        <option value="v6.0" className="bg-[#1a1a1a]">Version 6</option>
+                                        <option value="v5.2" className="bg-[#1a1a1a]">Version 5.2</option>
+                                        <option value="v5.1" className="bg-[#1a1a1a]">Version 5.1</option>
+                                        <option value="niji6" className="bg-[#1a1a1a]">Niji 6</option>
+                                        <option value="niji7" className="bg-[#1a1a1a]">Niji 7</option>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-semibold text-muted-foreground">SPEED</Label>
+                                    <Select value={mjSpeed} onChange={(e) => setMjSpeed(e.target.value)} className="w-full premium-input border-white/10 text-white text-xs h-9">
+                                        <option value="relaxed" className="bg-[#1a1a1a]">Relaxed</option>
+                                        <option value="fast" className="bg-[#1a1a1a]">Fast</option>
+                                        <option value="turbo" className="bg-[#1a1a1a]">Turbo</option>
+                                    </Select>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {engine !== "midjourney" && (
+                        <div className="space-y-2">
+                            <Label className="text-xs font-semibold text-muted-foreground">QUALITY</Label>
+                            <Select
+                                value={quality}
+                                onChange={(e) => setQuality(e.target.value)}
+                                className="w-full premium-input border-white/10 text-white"
+                            >
+                                {QUALITIES.map((q) => (
+                                    <option key={q.value} value={q.value} className="bg-[#1a1a1a] text-white">
+                                        {q.label}
+                                    </option>
+                                ))}
+                            </Select>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <div className="flex items-center bg-[#1a1a1a] rounded-lg border border-white/5 p-1">
@@ -961,31 +1122,31 @@ export function ControlPanel({
                                 <Plus className="h-3 w-3" />
                             </Button>
                         </div>
-
-
                     </div>
 
                     {/* Fixed Seed Toggle */}
-                    <div className="bg-[#1a1a1a] rounded-lg p-3 border border-white/5 space-y-2">
-                        <div className="flex items-center justify-between">
-                            <Label className="text-xs font-semibold text-white">Fixed seed</Label>
-                            <div
-                                className={cn(
-                                    "w-8 h-4 rounded-full relative cursor-pointer transition-colors",
-                                    fixedSeed ? "bg-white" : "bg-white/20"
-                                )}
-                                onClick={() => setFixedSeed(!fixedSeed)}
-                            >
-                                <div className={cn(
-                                    "absolute top-0.5 w-3 h-3 rounded-full bg-black transition-all",
-                                    fixedSeed ? "left-[18px]" : "left-0.5"
-                                )} />
+                    {engine !== "midjourney" && (
+                        <div className="bg-[#1a1a1a] rounded-lg p-3 border border-white/5 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-semibold text-white">Fixed seed</Label>
+                                <div
+                                    className={cn(
+                                        "w-8 h-4 rounded-full relative cursor-pointer transition-colors",
+                                        fixedSeed ? "bg-white" : "bg-white/20"
+                                    )}
+                                    onClick={() => setFixedSeed(!fixedSeed)}
+                                >
+                                    <div className={cn(
+                                        "absolute top-0.5 w-3 h-3 rounded-full bg-black transition-all",
+                                        fixedSeed ? "left-[18px]" : "left-0.5"
+                                    )} />
+                                </div>
                             </div>
+                            <p className="text-[10px] text-muted-foreground leading-tight">
+                                Enable this to get consistent results every time you use the same prompt.
+                            </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground leading-tight">
-                            Enable this to get consistent results every time you use the same prompt.
-                        </p>
-                    </div>
+                    )}
                 </div>
 
                 <Button
@@ -1001,13 +1162,41 @@ export function ControlPanel({
                     ) : (
                         <>
                             <Sparkles className="mr-2 h-4 w-4" />
-                            {mode === "edit" ? "Edit Image" : (mode === "custom" ? "Custom Design" : "Generate")}
+                            {mode === "edit" ? "Edit Image" : mode === "custom" ? "Custom Design" : `Generate (${(engine === "kie" || engine === "fal") ? (quality === "ULTRA_4K" ? "24" : "18") : engine === "midjourney" && mjSpeed === "turbo" ? "2" : "1"} Credit)`}
                         </>
                     )}
                 </Button>
+            </div>
 
+            {/* Generating Overlay */}
+            {isGenerating && (
+                <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
+                    <div className="relative mb-8">
+                        {/* Improved Glowing Effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 blur-2xl opacity-30 animate-pulse rounded-full"></div>
+                        <div className="relative z-10 p-4 bg-white/5 rounded-2xl border border-white/10 backdrop-blur-xl shadow-2xl animate-bounce-slow">
+                            <Sparkles className="h-10 w-10 text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 animate-spin-slow" />
+                        </div>
+                    </div>
 
-            </div >
-        </div >
+                    {/* Funny/Creative Message */}
+                    <div className="text-center px-4 max-w-md">
+                        <p className="text-xl font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 text-transparent bg-clip-text animate-pulse">
+                            {loadingMessage || "Creating magic..."}
+                        </p>
+                        <p className="mt-2 text-xs text-white/40 font-mono">
+                            (This might take a sec)
+                        </p>
+                    </div>
+
+                    {/* Progress Indicators */}
+                    <div className="mt-8 flex gap-2">
+                        <div className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                        <div className="w-2 h-2 rounded-full bg-pink-500 animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                        <div className="w-2 h-2 rounded-full bg-yellow-500 animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                    </div>
+                </div>
+            )}
+        </div>
     );
 }

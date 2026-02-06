@@ -29,7 +29,13 @@ export async function POST(req: NextRequest) {
             aspectRatio,
             fixedSeed,
             quality = "BASE_1K",
-            engine = "kie" // Default to Kie
+            engine = "kie", // Default to Kie
+            // MJ Params
+            mjStylize,
+            mjWeirdness,
+            mjVariety,
+            mjVersion,
+            mjSpeed
         } = body;
 
         if (!prompt && !editInstruction) {
@@ -53,6 +59,7 @@ export async function POST(req: NextRequest) {
         console.log("Engine:", engine);
         console.log("Quality:", quality);
         console.log("Prompt:", prompt);
+        console.log("AspectRatio:", aspectRatio);
         console.log("--------------------------");
 
         let finalImage = "";
@@ -148,6 +155,67 @@ export async function POST(req: NextRequest) {
                 console.error("Vertex Generation Failed:", vertexError);
                 throw vertexError;
             }
+        } else if (engine === "midjourney") {
+            try {
+                console.log("Using Midjourney (Kie) engine...");
+
+                // Dynamic import to avoid issues if usage is conditional
+                const { generateImageWithMj } = await import("@/lib/kie-mj");
+                const mjResult = await generateImageWithMj(
+                    editInstruction ? `${prompt} . ${editInstruction}` : prompt,
+                    aspectRatio,
+                    {
+                        stylize: mjStylize,
+                        weirdness: mjWeirdness,
+                        variety: mjVariety,
+                        version: mjVersion,
+                        speed: mjSpeed
+                    }
+                );
+
+                // 5. Deduct Credits
+                const deductionAmount = (mjSpeed === "turbo") ? 2 : 1;
+                const deductStmt = db.prepare(
+                    "UPDATE credits SET amount = amount - ? WHERE user_id = ?"
+                );
+                deductStmt.run(deductionAmount, userId);
+
+                // 6. Save to History (Pending)
+                const insertStmt = db.prepare(`
+                    INSERT INTO generations (user_id, prompt, style, size, image_url, quality, reference_image_url, status, taskId, engine)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `);
+
+                // Determine Ref Image
+                let savedRefImage = null;
+                if (editImage) savedRefImage = editImage;
+                else if (referenceImages && referenceImages.length > 0) savedRefImage = referenceImages[0];
+
+                insertStmt.run(
+                    userId,
+                    prompt || editInstruction || "Image",
+                    "Midjourney v6.0",
+                    "1024x1024", // Placeholder
+                    "", // No image yet
+                    quality,
+                    savedRefImage,
+                    "pending",
+                    mjResult.taskId,
+                    "midjourney"
+                );
+
+                return NextResponse.json({
+                    success: true,
+                    imageUrl: "", // Client should handle this as pending
+                    status: "pending",
+                    taskId: mjResult.taskId,
+                    credits: credits.amount - deductionAmount,
+                });
+
+            } catch (mjError: unknown) {
+                console.error("MJ Generation Failed:", mjError);
+                throw mjError;
+            }
         }
 
         // Gemini Logic (Default or Fallback)
@@ -194,15 +262,22 @@ export async function POST(req: NextRequest) {
         }
 
         // 5. Deduct Credits
+        let deductionAmount = 1;
+        if (engine === "kie" || engine === "fal") {
+            deductionAmount = (quality === "ULTRA_4K") ? 24 : 18;
+        } else if (engine === "midjourney" && mjSpeed === "turbo") {
+            deductionAmount = 2;
+        }
+
         const deductStmt = db.prepare(
-            "UPDATE credits SET amount = amount - 1 WHERE user_id = ?"
+            "UPDATE credits SET amount = amount - ? WHERE user_id = ?"
         );
-        deductStmt.run(userId);
+        deductStmt.run(deductionAmount, userId);
 
         // 6. Save to History
         const insertStmt = db.prepare(`
-            INSERT INTO generations (user_id, prompt, style, size, image_url, quality, reference_image_url, local_path)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO generations (user_id, prompt, style, size, image_url, quality, reference_image_url, local_path, status, taskId, engine)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         // Determine reference/edit image URL to save
@@ -264,7 +339,10 @@ export async function POST(req: NextRequest) {
             finalImage,
             quality,
             savedRefImage,
-            actualLocalPath
+            actualLocalPath,
+            "completed", // status
+            null, // taskId
+            engine // engine
         );
 
         return NextResponse.json({
@@ -272,7 +350,7 @@ export async function POST(req: NextRequest) {
             imageUrl: finalImage,
             aspectRatio,
             quality,
-            credits: credits.amount - 1,
+            credits: credits.amount - deductionAmount,
         });
 
     } catch (error: unknown) {

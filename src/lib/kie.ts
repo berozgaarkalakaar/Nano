@@ -142,14 +142,18 @@ export async function generateImageWithKie(config: KieTaskConfig): Promise<strin
         },
         body: JSON.stringify({
             model: "nano-banana-pro",
-            input: {
-                prompt: config.prompt,
-                aspect_ratio: config.aspectRatio || "1:1",
-                resolution: config.resolution || "1K",
-                output_format: config.outputFormat || "png",
-                image_input: imageUrls,
-                seed: config.seed
-            }
+            input: (() => {
+                const input = {
+                    prompt: config.prompt,
+                    aspect_ratio: config.aspectRatio || "1:1",
+                    resolution: config.resolution || "1K",
+                    output_format: config.outputFormat || "png",
+                    image_input: imageUrls,
+                    seed: config.seed
+                };
+                console.log("Kie Input Payload:", JSON.stringify(input, null, 2));
+                return input;
+            })()
         })
     });
 

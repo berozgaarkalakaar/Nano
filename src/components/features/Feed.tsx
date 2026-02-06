@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MoreHorizontal, Download, RefreshCw, History, Folder, Video, Edit2, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Generation } from "@/types";
@@ -22,18 +22,59 @@ interface FeedProps {
     isGenerating?: boolean;
 }
 
+const FUNNY_MESSAGES = [
+    "Hold my coffee, I'm imaging...",
+    "Convincing the pixels to cooperate...",
+    "Reticulating splines...",
+    "Consulting the oracle of creativity...",
+    "Waking up the hamsters...",
+    "Teaching the AI to paint...",
+    "Summoning the art spirits...",
+    "Googling 'how to draw'...",
+    "Adding extra sparkle...",
+    "Generating masterpiece (hopefully)...",
+    "Feeding the GPU...",
+    "Thinking really hard...",
+    "Do not turn off console...",
+    "Making it pop...",
+    "Applying magic dust..."
+];
+
 function SkeletonCard() {
+    const [message, setMessage] = useState("Creating magic...");
+
+    useEffect(() => {
+        setMessage(FUNNY_MESSAGES[Math.floor(Math.random() * FUNNY_MESSAGES.length)]);
+    }, []);
+
     return (
         <div className="space-y-3">
             <div className="relative rounded-xl overflow-hidden bg-[#1a1a1a] border border-white/5 aspect-[4/5] flex items-center justify-center group">
                 <div className="absolute inset-0 bg-gradient-to-tr from-purple-500/10 via-transparent to-blue-500/10 animate-pulse" />
-                <div className="flex flex-col items-center gap-3 z-10">
+
+                {/* Dynamic Center Animation */}
+                <div className="flex flex-col items-center gap-4 z-10 p-4 text-center">
                     <div className="relative">
-                        <div className="absolute inset-0 bg-purple-500/20 blur-xl rounded-full animate-pulse" />
-                        <Sparkles className="h-8 w-8 text-purple-400 animate-bounce" />
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 blur-2xl rounded-full animate-pulse opacity-50" />
+                        <div className="relative flex items-center justify-center">
+                            {/* Double Spinner Effect */}
+                            <div className="absolute inset-0 border-2 border-t-transparent border-l-transparent border-purple-400 rounded-full animate-spin"></div>
+                            <div className="absolute inset-[-4px] border-2 border-b-transparent border-r-transparent border-pink-400 rounded-full animate-spin-reverse opacity-70"></div>
+
+                            <Sparkles className="h-8 w-8 text-white relative z-10 animate-pulse" />
+                        </div>
                     </div>
-                    <span className="text-sm font-medium text-purple-200/70 animate-pulse">Dreaming...</span>
+
+                    <div className="flex flex-col gap-1">
+                        <span className="text-sm font-bold bg-gradient-to-r from-indigo-300 via-purple-300 to-pink-300 text-transparent bg-clip-text animate-pulse">
+                            {message}
+                        </span>
+                        <span className="text-[10px] text-white/30 font-mono tracking-wider animate-pulse delay-75">
+                            PLEASE WAIT...
+                        </span>
+                    </div>
                 </div>
+
                 {/* Scanning line effect */}
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/5 to-transparent -translate-y-full animate-[shimmer_2s_infinite]" />
             </div>
@@ -47,6 +88,36 @@ function SkeletonCard() {
 
 export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) {
     const router = useRouter();
+
+    // Polling for pending tasks
+    useEffect(() => {
+        const pendingItems = generations.filter(g => g.status === 'pending' && g.taskId);
+        if (pendingItems.length === 0) return;
+
+        const intervalId = setInterval(async () => {
+            let shouldRefresh = false;
+            for (const item of pendingItems) {
+                if (!item.taskId) continue;
+                try {
+                    const res = await fetch(`/api/generate/status/${item.taskId}`);
+                    const data = await res.json();
+                    if (data.status === 'succeeded' || data.status === 'failed') {
+                        shouldRefresh = true;
+                    }
+                } catch (e) {
+                    console.error("Polling error", e);
+                }
+            }
+            if (shouldRefresh) {
+                console.log("Task completed, refreshing feed...");
+                router.refresh(); // Triggers server re-fetch
+                onShowHistory?.(); // Update if using client-side fetch callback
+            }
+        }, 3000); // Check every 3 seconds
+
+        return () => clearInterval(intervalId);
+    }, [generations, router, onShowHistory]);
+
     const handleDownload = async (imageUrl: string, prompt: string, bedName?: string) => {
         try {
             const response = await fetch(imageUrl);
@@ -159,6 +230,37 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
             setSelectedImage(null);
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const handleMjAction = async (action: "upscale" | "vary", index: number, gen: Generation) => {
+        if (!gen.taskId) {
+            alert("No Task ID found for this generation.");
+            return;
+        }
+        try {
+            const response = await fetch("/api/generate/action", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action,
+                    taskId: gen.taskId,
+                    index,
+                    generationId: gen.id
+                })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert(`Action ${action} initiated!`);
+                onShowHistory?.();
+                // Ideally close lightbox or show toast.
+                setSelectedImage(null);
+            } else {
+                alert(`Action failed: ${data.error}`);
+            }
+        } catch (error) {
+            console.error("MJ Action Error:", error);
+            alert("Failed to trigger action.");
         }
     };
 
@@ -358,6 +460,17 @@ export function Feed({ generations, onVary, onEdit, onShowHistory }: FeedProps) 
                     onDelete={handleSingleDelete}
                     onDownload={handleDownload}
                     onCopyPrompt={handleCopyPrompt}
+                    onNext={() => {
+                        const idx = generations.findIndex(g => g.id === selectedImage.id);
+                        if (idx < generations.length - 1) setSelectedImage(generations[idx + 1]);
+                    }}
+                    onPrev={() => {
+                        const idx = generations.findIndex(g => g.id === selectedImage.id);
+                        if (idx > 0) setSelectedImage(generations[idx - 1]);
+                    }}
+                    hasNext={generations.findIndex(g => g.id === selectedImage.id) < generations.length - 1}
+                    hasPrev={generations.findIndex(g => g.id === selectedImage.id) > 0}
+                    onMjAction={(action, index) => handleMjAction(action, index, selectedImage)}
                 />
             )}
         </div>

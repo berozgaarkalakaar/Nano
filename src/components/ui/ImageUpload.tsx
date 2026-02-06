@@ -43,10 +43,38 @@ export function ImageUpload({
             onUpload(validFiles);
         } else if (onChange && validFiles.length > 0) {
             // For single file, just read the first one
+            // For single file, just read the first one
             const file = validFiles[0];
             const reader = new FileReader();
             reader.onloadend = () => {
-                onChange(reader.result as string);
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Resize if larger than 2048px
+                    const MAX_SIZE = 2048;
+                    if (width > MAX_SIZE || height > MAX_SIZE) {
+                        if (width > height) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        } else {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+
+                    // Compress to JPEG 0.85
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                    onChange(dataUrl);
+                };
+                img.src = reader.result as string;
             };
             reader.readAsDataURL(file);
         }

@@ -11,4 +11,5 @@ export interface Generation {
     timestamp?: number;
     created_at?: string;
     reference_image_url?: string;
+    taskId?: string;
 }

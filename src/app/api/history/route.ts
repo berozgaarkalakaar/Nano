@@ -10,6 +10,7 @@ export async function GET() {
             FROM generations 
             WHERE user_id = ? 
             ORDER BY created_at DESC
+            LIMIT 50
         `);
 
         const generations = stmt.all(userId);

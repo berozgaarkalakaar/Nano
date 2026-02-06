@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Trash2, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,33 @@ export function HistoryGrid({ generations: initialGenerations }: HistoryGridProp
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
+
+    // Polling Logic
+    useEffect(() => {
+        const pendingItems = generations.filter(g => g.status === 'pending' && g.taskId);
+        if (pendingItems.length === 0) return;
+
+        const intervalId = setInterval(async () => {
+            let shouldRefresh = false;
+            for (const item of pendingItems) {
+                if (!item.taskId) continue;
+                try {
+                    const res = await fetch(`/api/generate/status/${item.taskId}`);
+                    const data = await res.json();
+                    if (data.status === 'succeeded' || data.status === 'failed') {
+                        shouldRefresh = true;
+                    }
+                } catch (e) {
+                    console.error("Polling error", e);
+                }
+            }
+            if (shouldRefresh) {
+                router.refresh();
+            }
+        }, 3000);
+
+        return () => clearInterval(intervalId);
+    }, [generations, router]);
 
     const toggleSelectionMode = () => {
         setIsSelectionMode(!isSelectionMode);
@@ -128,6 +155,41 @@ export function HistoryGrid({ generations: initialGenerations }: HistoryGridProp
         router.push(`/?${params.toString()}`);
     };
 
+    // Sync state with props when router refreshes
+    useEffect(() => {
+        setGenerations(initialGenerations);
+    }, [initialGenerations]);
+
+    const handleMjAction = async (action: "upscale" | "vary", index: number, gen: Generation) => {
+        if (!gen.taskId) {
+            alert("No Task ID found for this generation.");
+            return;
+        }
+        try {
+            const response = await fetch("/api/generate/action", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action,
+                    taskId: gen.taskId,
+                    index,
+                    generationId: gen.id
+                })
+            });
+            const data = await response.json();
+            if (response.ok) {
+                alert(`Action ${action} initiated! Check history shortly.`);
+                router.refresh(); // Refresh server props
+                setSelectedImage(null);
+            } else {
+                alert(`Action failed: ${data.error}`);
+            }
+        } catch (error) {
+            console.error("MJ Action Error:", error);
+            alert("Failed to trigger action.");
+        }
+    };
+
     const handleSingleDelete = async (gen: Generation) => {
         if (!window.confirm("Are you sure you want to delete this generation?")) {
             return;
@@ -143,6 +205,7 @@ export function HistoryGrid({ generations: initialGenerations }: HistoryGridProp
             if (response.ok) {
                 setGenerations(prev => prev.filter(g => g.id !== gen.id));
                 setSelectedImage(null); // Close Lightbox
+                router.refresh();
             } else {
                 alert("Failed to delete item.");
             }
@@ -221,8 +284,8 @@ export function HistoryGrid({ generations: initialGenerations }: HistoryGridProp
                             {/* Selection Checkbox Overlay */}
                             {isSelectionMode && (
                                 <div className={`absolute top-2 left-2 z-20 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-colors ${selectedItems.has(gen.id)
-                                        ? "bg-blue-500 border-blue-500"
-                                        : "bg-black/50 border-white/50 hover:border-white"
+                                    ? "bg-blue-500 border-blue-500"
+                                    : "bg-black/50 border-white/50 hover:border-white"
                                     }`}>
                                     {selectedItems.has(gen.id) && <Check className="h-4 w-4 text-white" />}
                                 </div>
@@ -262,6 +325,17 @@ export function HistoryGrid({ generations: initialGenerations }: HistoryGridProp
                     onDelete={handleSingleDelete}
                     onDownload={(url, prompt) => handleDownload(url || "", prompt || "")}
                     onCopyPrompt={handleCopyPrompt}
+                    onNext={() => {
+                        const idx = generations.findIndex(g => g.id === selectedImage.id);
+                        if (idx < generations.length - 1) setSelectedImage(generations[idx + 1]);
+                    }}
+                    onPrev={() => {
+                        const idx = generations.findIndex(g => g.id === selectedImage.id);
+                        if (idx > 0) setSelectedImage(generations[idx - 1]);
+                    }}
+                    hasNext={generations.findIndex(g => g.id === selectedImage.id) < generations.length - 1}
+                    hasPrev={generations.findIndex(g => g.id === selectedImage.id) > 0}
+                    onMjAction={(action, index) => handleMjAction(action, index, selectedImage)}
                 />
             )}
         </>
